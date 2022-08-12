@@ -5,7 +5,7 @@ from openpyxl.utils import get_column_letter
 from typing import Dict, List, Tuple
 import math
 
-def write_tables_to_excel_workbook(tables_arrays:Dict[str,List[List[str]]], output_file:str="AP Status.xlsx", workbook:str="") -> None:
+def write_tables_to_excel_workbook(tables_arrays:Dict[str,List[List[List[str]]]], output_file:str="AP Status.xlsx", workbook:str="") -> None:
     
     if workbook == "":
         workbook = Workbook()
