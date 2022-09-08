@@ -8,9 +8,9 @@ class MistAPIHandler:
     BASE_URL :str = 'https://api.mist.com/api/v1/'
     headers :Dict[str,str] = {
         'Content-Type':'application/json',
-        'X-CSRFToken':''
+        'X-CSRFTOKEN':''
     }
-    cookies:Dict[str,str] = {'sessionid':''}
+    cookies:Dict[str,str] = {'sessionid':'', 'csrftoken':''}
     login_methods :list[str]= [
        'usr_pw',
        'oauth2'
@@ -24,6 +24,7 @@ class MistAPIHandler:
         "sites" : "orgs/{}/sites",
         "site" : "sites/{}",
         "site_group" : "orgs/{}/sitegroups",
+        "site_devices" : "sites/{}/devices",
         "inventory" : "orgs/{}/inventory",
         "bounce_tunterm_data_ports" : "orgs/{}/mxedges/{}/services/tunterm/bounce_port",
         "mistedge_restart" : "orgs/{}/mxedges/{}/restart",
@@ -56,8 +57,9 @@ class MistAPIHandler:
             full_api_path = f"{self.BASE_URL}{api_path}"
             response = requests.post(full_api_path,data=body,headers={'Content-Type':'application/json'})
             if response.status_code == 200:
-                self.headers['X-CSRFToken'] = response.cookies.get('csrftoken')
+                self.headers['X-CSRFTOKEN'] = response.cookies.get('csrftoken')
                 self.cookies['sessionid'] = response.cookies.get('sessionid')
+                self.cookies['csrftoken'] = response.cookies.get('csrftoken')
                 return True
             else:
                 raise ValueError
@@ -72,8 +74,9 @@ class MistAPIHandler:
                     body = json.dumps({'two_factor':two_factor})
                     response = requests.post(full_api_path,data=body,headers={'Content-Type':'application/json'})
                     if response.status_code == 200:
-                        self.headers['X-CSRFToken'] = response.cookies.get('csrftoken')
+                        self.headers['X-CSRFTOKEN'] = response.cookies.get('csrftoken')
                         self.cookies['sessionid'] = response.cookies.get('sessionid')
+                        self.cookies['csrftoken'] = response.cookies.get('csrftoken')
                         return True
                     else:
                         raise ValueError
@@ -84,8 +87,9 @@ class MistAPIHandler:
                 full_api_path = f"{self.BASE_URL}{api_path}"
                 response = requests.post(full_api_path,data=body,headers={'Content-Type':'application/json'})
                 if response.status_code == 200:
-                    self.headers['X-CSRFToken'] = response.cookies.get('csrftoken')
+                    self.headers['X-CSRFTOKEN'] = response.cookies.get('csrftoken')
                     self.cookies['sessionid'] = response.cookies.get('sessionid')
+                    self.cookies['csrftoken'] = response.cookies.get('csrftoken')
                     return True
                 else:
                     raise ValueError
@@ -129,6 +133,10 @@ class MistAPIHandler:
     def update_site(self, site_id:str, site_info:Dict[str,str]) -> Dict[str,str]:
 
         return self._action_api_endpoint('site',[site_id],call_body=site_info,action='put')
+
+    def get_site_devices(self, site_id:str) -> Dict[str,str]:
+
+        return self._action_api_endpoint('site_devices', [site_id])
 
     def get_inventory(self, org_id:str) -> Dict[str,str]:
 
