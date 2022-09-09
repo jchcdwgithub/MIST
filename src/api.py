@@ -35,6 +35,7 @@ class MistAPIHandler:
         "get_mxedge_clusters" : "orgs/{}/mxclusters",
         "wlan" : "orgs/{}/wlans",
     }
+    sites = {}
     
     def __init__(self, login_method:str, login_params:Dict[str,str]) -> None:
         if login_method not in self.login_methods:
@@ -93,6 +94,11 @@ class MistAPIHandler:
                     return True
                 else:
                     raise ValueError
+
+    def populate_site_id_dict(self, org_id:str):
+        sites = self.get_sites(org_id)
+        for site in sites:
+            self.sites[site['name']] = site['id']
 
     def _login_oauth2(self, login_params:Dict[str,str]) -> bool:
         pass

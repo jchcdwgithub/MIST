@@ -1,5 +1,5 @@
 /config
 /src/local_runner.py
-/__pycache__
+__pycache__
 /Sentara
 /*.xlsx
