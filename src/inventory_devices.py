@@ -117,3 +117,12 @@ def is_valid_mac(mac:str, delimiter:str = '') -> bool:
         return True
     else:
         return False 
+
+def create_assigned_aps_txt(assign_jsons:List[Dict]):
+    for assign_json in assign_jsons:
+        csv_filename = f'assigned_aps_{assign_json["site_id"]}.txt'
+        with open(csv_filename, 'a+') as assigned_aps_f:
+            lines = []
+            for ap_mac in assign_json['macs']:
+                lines.append(f'{ap_mac}\n')
+            assigned_aps_f.writelines(lines)
