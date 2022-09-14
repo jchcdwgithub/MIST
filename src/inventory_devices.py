@@ -1,7 +1,8 @@
 from api import MistAPIHandler
 import excel
 import pandas
-from typing import List, Dict
+import re
+from typing import List, Dict, Tuple
 
 def inventory_devices(handler:MistAPIHandler, org_id:str):
     try:
@@ -56,3 +57,63 @@ def create_site_to_ap_name_mac_from_dataframe(dataframe:pandas.DataFrame, header
             _, ap_name, ap_mac = item
             site_mac_name[name][ap_mac.lower()] = ap_name
     return site_mac_name
+
+def remove_floor_from_site_name(site:str) -> str:
+    floor = re.compile(r'Flr-\d+$')
+    floor_match = floor.search(site)
+    if not floor_match:
+        raise ValueError('Site does not conform to SITE Flr-xx format.')
+    else:
+        start = floor_match.start()
+        return site[:start-1]
+
+def create_assign_json(site:Tuple[str, Dict[str, str]], site_name_to_id:Dict[str, str], name_association:Dict[str, str] = None) -> Dict:
+    """
+        param: site is a dictionary of name to a list of dictionaries with ap macs as keys and ap names as values.
+        param: site_name_to_id is a dictionary of site names to site ids
+        param: name_association is a dictionary of name to site name. If there is a difference between the naming on the input file and 
+               the site name in the dashboard, this must be included.
+
+        returns: the assign json file with the site_id and macs fields populated.
+    """
+
+    assign_json = { 
+        'op' : 'assign',
+        'site_id' : '',
+        'macs' : [],
+        'no_reassign' : False
+    }
+
+    site_name, site_aps = site
+
+    if name_association:
+        if name_association[site_name] in site_name_to_id:
+            assign_json['site_id'] = site_name_to_id[name_association[site_name]]
+        else:
+            raise KeyError('The site name is either mistyped or the site doesn\'t exist in this organization')
+    else:
+        assign_json['site_id'] = site_name
+        
+    for ap_mac in site_aps:
+        assign_json['macs'].append(ap_mac)
+
+    return assign_json
+
+def remove_invalid_macs(macs:List[str], delimiter:str = '') -> List[str]:
+    base_match_string = '^[a-fA-F0-9]{2}' + f'({delimiter}[a-fA-F0-9]'
+    match_string = base_match_string + '{2}){5}$'
+    mac_pattern = re.compile(r''+match_string)
+    valid_macs = []
+    for mac in macs:
+        if mac_pattern.match(mac):
+            valid_macs.append(mac)
+    return valid_macs
+
+def is_valid_mac(mac:str, delimiter:str = '') -> bool:
+    base_match_string = '^[a-fA-F0-9]{2}' + f'({delimiter}[a-fA-F0-9]'
+    match_string = base_match_string + '{2}){5}$'
+    mac_pattern = re.compile(r''+match_string)
+    if mac_pattern.match(mac):
+        return True
+    else:
+        return False 
