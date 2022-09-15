@@ -125,3 +125,49 @@ def create_assigned_aps_txt(assign_jsons:List[Dict]):
             for ap_mac in assign_json['macs']:
                 lines.append(f'{ap_mac}\n')
             assigned_aps_f.writelines(lines)
+
+def create_site_to_mac_dict(values:pandas.DataFrame) -> Dict:
+    site_mac_name = {} 
+    for name, group in values:
+        try:
+            name_wo_floor = remove_floor_from_site_name(name)
+        except ValueError:
+            name_wo_floor = name
+        if name_wo_floor not in site_mac_name:
+            site_mac_name[name_wo_floor] = {}
+        for item in group.values:
+            _, ap_name, ap_mac = item
+            if is_valid_mac(ap_mac):
+                site_mac_name[name_wo_floor][ap_mac.lower()] = ap_name
+            else:
+                print('Found invalid mac for ap {}'.format(ap_name))
+    return site_mac_name
+
+def convert_site_mac_dict_to_tuples(site_mac_name:Dict) -> Tuple:
+    sites_to_aps_tuples = []
+    for site in site_mac_name:
+        current_tuple = (site, site_mac_name[site])
+        sites_to_aps_tuples.append(current_tuple)
+    return sites_to_aps_tuples
+
+def get_site_names_from_config_sites(config_sites:Dict) -> List[str]:
+    site_key_regex = re.compile(r'site\d+')
+    site_names = []
+    for key in config_sites:
+        if site_key_regex.match(key):
+            site_names.append(config_sites[key]['name'])
+    return site_names
+
+def create_name_association_dict(config_sites:Dict) -> Dict[str,str]:
+    site_key_regex = re.compile(r'site\d+')
+    name_association = {}
+    for key in config_sites:
+        if site_key_regex.match(key):
+            if 'excel_name' in config_sites[key]:
+                excel_name = config_sites[key]['excel_name']
+                name = config_sites[key]['name']
+                name_association[excel_name] = name
+            else:
+                name = config_sites[key]['name']
+                name_association[name] = name
+    return name_association

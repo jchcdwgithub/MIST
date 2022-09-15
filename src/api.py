@@ -36,7 +36,8 @@ class MistAPIHandler:
         "get_mxedge_clusters" : "orgs/{}/mxclusters",
         "wlan" : "orgs/{}/wlans",
     }
-    sites = {}
+    sites  = {}
+    org_id = ''
     
     def __init__(self, login_method:str, login_params:Dict[str,str]) -> None:
         if login_method not in self.login_methods:
@@ -96,10 +97,19 @@ class MistAPIHandler:
                 else:
                     raise ValueError
 
-    def populate_site_id_dict(self, org_id:str):
-        sites = self.get_sites(org_id)
+    def populate_site_id_dict(self):
+        sites = self.get_sites(self.org_id)
         for site in sites:
             self.sites[site['name']] = site['id']
+
+    def save_org_id_by_name(self, org_name:str):
+        login_response = self.check_login()
+        for scope in login_response['privileges']:
+            if scope['scope'] == 'org' and scope['name'] == org_name:
+                self.org_id = scope['org_id']
+                break
+        if self.org_id == '':
+            raise ValueError('org name not found in orgs that you manage.') 
 
     def _login_oauth2(self, login_params:Dict[str,str]) -> bool:
         pass
@@ -163,7 +173,7 @@ class MistAPIHandler:
         """
         return self._action_api_endpoint('inventory', [org_id], call_body=inventory_info, action='post')
 
-    def assign_inventory_to_site(self, org_id:str, inventory_info:Dict[str,str]) -> Dict[str, str]:
+    def assign_inventory_to_site(self, inventory_info:Dict[str,str], org_id:str='') -> Dict[str, str]:
         """
         {
             "op" : "assign",
@@ -175,7 +185,7 @@ class MistAPIHandler:
         }
         """
 
-        return self._action_api_endpoint('inventory', [org_id], call_body=inventory_info, action='put')
+        return self._action_api_endpoint('inventory', [org_id if org_id != '' else self.org_id], call_body=inventory_info, action='put')
 
     def unassign_inventory_from_site(self, org_id:str, inventory_info:Dict[str,str]) -> Dict[str,str]:
         """
