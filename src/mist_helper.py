@@ -1,20 +1,10 @@
 from api import MistAPIHandler
 import inventory_devices
-import re
-import yaml
-from file_ops import ExcelReader
+from file_ops import ExcelReader, ConfigReader
+from typing import List, Tuple, Dict
 
-with open('config.yml') as f:
-    current_index = 0
-    config_index = 0
-    config_lines = f.read()
-    yaml_str = ''
-    site_match = re.compile(r'site:')
-    num_matches = len(site_match.findall(config_lines))
-    while current_index < num_matches:
-        config_lines = config_lines.replace('site:', f'site{current_index}:',1)
-        current_index += 1
-    config = yaml.load(config_lines, Loader=yaml.Loader)
+config_reader = ConfigReader('config.yml')
+config = config_reader.extract_information_from_file()
 
 headers = []
 config_sites = config['sites']
@@ -34,33 +24,51 @@ handler.populate_site_id_dict()
 site_name_to_id = handler.sites
 name_association = inventory_devices.create_name_association_dict(config_sites)
 
+class AssignTask:
+    def __init__(self, site_mac_name:Tuple[str,List[str]], site_name_to_id:Dict[str, str], name_association:Dict[str,str]):
+        self.smn = site_mac_name
+        self.sn_id = site_name_to_id
+        self.name_assoc = name_association
 
-assign_jsons = []
-for site in smn_tuples:
-    try:    
-        assign_json = inventory_devices.create_assign_json(site, site_name_to_id, name_association=name_association) 
-        assign_jsons.append(assign_json)
-    except KeyError:
+    def perform_task() -> Tuple[List, List]:
+        
+        assign_jsons = []
+        for site in smn_tuples:
+            try:    
+                assign_json = inventory_devices.create_assign_json(site, site_name_to_id, name_association=name_association) 
+                assign_jsons.append(assign_json)
+            except KeyError:
+                pass
+
+        for assign_json in assign_jsons:
+            success_filename = f'assigned_aps_{assign_json["site_id"]}.txt'
+            error_filename = f'unassigned_aps_{assign_json["site_id"]}.txt'
+            success = []
+            error = []
+            try:
+                response = handler.assign_inventory_to_site(assign_json)
+                success = response['success']
+                error = response['error']
+            except Exception as e:
+                print(e)
+
+            with open(success_filename, 'a+') as assigned_aps_f, open(error_filename, 'a+') as unassigned_aps_f:
+                lines = []
+                for ap_mac in success:
+                    lines.append(f'{ap_mac}\n')
+                assigned_aps_f.writelines(lines)
+                if len(error) > 0:
+                    for ap_mac in error:
+                        lines.append(f'{ap_mac}\n')
+                unassigned_aps_f.writelines(lines)
+        
+        return success, error
+
+class RenameAPTask:
+
+    def __init__(self, site_mac_name:Dict[str, Dict[str,str]], name_association:Dict[str,str]):
+        self.smn = site_mac_name
+        self.name_assoc = name_association
+    
+    def perform_task() -> Tuple[List, List]:
         pass
-
-for assign_json in assign_jsons:
-    success_filename = f'assigned_aps_{assign_json["site_id"]}.txt'
-    error_filename = f'unassigned_aps_{assign_json["site_id"]}.txt'
-    success = []
-    error = []
-    try:
-        response = handler.assign_inventory_to_site(assign_json)
-        success = response['success']
-        error = response['error']
-    except Exception as e:
-        print(e)
-
-    with open(success_filename, 'a+') as assigned_aps_f, open(error_filename, 'a+') as unassigned_aps_f:
-        lines = []
-        for ap_mac in success:
-            lines.append(f'{ap_mac}\n')
-        assigned_aps_f.writelines(lines)
-        if len(error) > 0:
-            for ap_mac in error:
-                lines.append(f'{ap_mac}\n')
-        unassigned_aps_f.writelines(lines)

@@ -116,5 +116,3 @@ def test_create_name_association_dict_creates_name_to_name_associations_when_onl
     expected = {'SCP-Sentara SCP MOB':'SCP-Sentara SCP MOB', 'SCP-Sentara SCP MAB': 'SCP-Sentara SCP MAB'}
     generated = inventory_devices.create_name_association_dict(test_data)
     assert expected == generated
-
-def test_
