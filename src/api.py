@@ -325,32 +325,3 @@ class MistAPIHandler:
             return response.json()
         else:
             raise Exception(f"Request failed: {response.status_code} {response.reason}")
-
-class MistJson:
-
-    dependencies: List[str] = [] 
-    structure: Dict[str,str]
-    
-    def __init__(self, structure:Dict[str,str], dependencies:List[str]=[]) -> None:
-        self.structure = structure,
-        self.dependencies = dependencies
-
-    def is_dependency(self, possible:str) -> bool:
-        return possible in self.dependencies
-
-SITE_JSON = MistJson(
-    {
-        "name" : "",
-        "timezone" : "",
-        "country_code" : "US",
-        "rftemplate_id" : "",
-        "secpolicy_id" : "",
-        "alarmtemplate_id" : "",
-        "networktemplate_id" : "",
-        "gatewaytemplate_id" : "",
-        "latlng" : { "lat": 0, "lng": 0},
-        "sitegroup_ids" : [],
-        "address" : ""
-    },
-    ["RF_TEMPLATE_JSON", "SEC_POLICY_JSON", "ALARM_TEMPLATE_JSON", "NETWORK_TEMPLATE_JSON", "GATEWAY_TEMPLATE_JSON"]
-)
