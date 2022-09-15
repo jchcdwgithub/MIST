@@ -110,9 +110,8 @@ def remove_invalid_macs(macs:List[str], delimiter:str = '') -> List[str]:
     return valid_macs
 
 def is_valid_mac(mac:str, delimiter:str = '') -> bool:
-    base_match_string = '^[a-fA-F0-9]{2}' + f'({delimiter}[a-fA-F0-9]'
-    match_string = base_match_string + '{2}){5}$'
-    mac_pattern = re.compile(r''+match_string)
+    mac_regex = '^[a-fA-F0-9]{2}' + f'({delimiter}[a-fA-F0-9]' + '{2}){5}$'
+    mac_pattern = re.compile(r''+mac_regex)
     if mac_pattern.match(mac):
         return True
     else:
