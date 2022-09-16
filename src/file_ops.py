@@ -49,3 +49,28 @@ class ConfigReader(IOReader):
             config_lines = config_lines.replace('site:', f'site{current_index}:',1)
             current_index += 1
         return config_lines
+
+class Writer:
+
+    def __init__(self):
+        pass
+
+    def write_results_to_files(site:Dict[str, Dict[str, List[str]]], site_id:str):
+        success_filename = f'assigned_aps_{site_id}.txt'
+        error_filename = f'unassigned_aps_{site_id}.txt'
+        with open(success_filename, 'a+') as assigned_aps_f, open(error_filename, 'a+') as unassigned_aps_f:
+            lines = []
+            unassigned_lines = []
+            success = site['success']                
+            error = site['error']
+
+            lines.append(f'{site[0].upper()}\n')
+            for ap_mac in success:
+                lines.append(f'{ap_mac}\n')
+            assigned_aps_f.writelines(lines)
+
+            if len(error) > 0:
+                unassigned_lines.append(f'{site[0].upper()}\n')
+                for ap_mac in error:
+                    lines.append(f'{ap_mac}\n')
+                unassigned_aps_f.writelines(unassigned_lines)

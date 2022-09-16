@@ -1,7 +1,88 @@
 import sys
 sys.path.append('C:/Users/jasohoa/Documents/Automation/MIST/src')
 import inventory_devices
+import tasks
 import pytest
+import random
+from typing import Dict, List
+
+
+class FakeAPIHandler:
+
+    def __init__(self):
+        self.data = []
+        self.sites = {
+            'site0' : 'id0',
+            'site1' : 'id1'
+        }
+        self.site_devices = {
+            'id0' : [ {'id': 'dev_id0', 'mac':'mac0'}],
+            'id1' : [ {'id' : 'dev_id1', 'mac':'mac1'}]
+        }
+    
+    def assign_inventory_to_site(self, request_body:Dict) -> Dict:
+        self.data.append(request_body)
+        assign_macs = request_body['macs']
+        return {
+            'op' : 'assign',
+            'success' : assign_macs,
+            'error' : []
+        }
+    
+    def config_site_device(self, site_id:str, device_id:str, request_body:Dict) -> Dict:
+        self.data.append(request_body)
+        name = request_body['name']
+        return {
+            'name' : name,
+            'id' : device_id,
+            'mac' : self.site_devices[site_id][0]['mac']
+        }
+
+    def get_site_devices(self, site_id:str) -> Dict:
+        return self.site_devices[site_id] 
+
+def generate_random_mac():
+    mac = ''
+    length = 12
+    while length > 0:
+        mac += random.choice('abcdef0123456789')
+        length -= 1
+    return mac
+
+def generate_site_mac_name(num_records_to_generate:int) -> Dict[str, Dict[str,str]]:
+    site_number = 0
+    site_mac_name_dict = {}
+    while site_number < num_records_to_generate:
+        site_mac_name_dict[f'site{site_number}'] = { generate_random_mac() : f'ap{site_number}' }
+    return site_mac_name_dict        
+
+@pytest.fixture
+def site_mac_name() -> Dict[str, Dict[str,str]]:
+    return {
+        'site0' : { generate_random_mac() : 'site0-ap-01' },
+        'site1' : { generate_random_mac() : 'site1-ap-01'}
+    }
+
+@pytest.fixture
+def static_site_mac_name() -> Dict[str, Dict[str,str]]:
+    return {
+        'site0' : {'mac0':'site0-ap-01'},
+        'site1' : {'mac1':'site1-ap-01'}
+    }
+
+@pytest.fixture
+def site_name_to_id() -> Dict[str, str]:
+    return {
+        'site0' : 'id0',
+        'site1' : 'id1'
+    }
+
+@pytest.fixture
+def name_association() -> Dict[str, str]:
+    return {
+        'site0' : 'site0',
+        'site1' : 'site1'
+    }
 
 def test_remove_floor_from_site_name_removes_floor():
     test_data = 'SCP MAB Flr-1'
@@ -116,3 +197,15 @@ def test_create_name_association_dict_creates_name_to_name_associations_when_onl
     expected = {'SCP-Sentara SCP MOB':'SCP-Sentara SCP MOB', 'SCP-Sentara SCP MAB': 'SCP-Sentara SCP MAB'}
     generated = inventory_devices.create_name_association_dict(test_data)
     assert expected == generated
+
+def test_AssignTask_creates_assign_jsons_and_pushes_to_handler(site_mac_name, site_name_to_id, name_association):
+    handler = FakeAPIHandler()
+    assign_task = tasks.AssignTask(site_mac_name, site_name_to_id, name_association, handler)
+    sites = assign_task.perform_task()
+    assert sites == {'site0':{'success':[list(site_mac_name['site0'].keys())[0]], 'error':[]}, 'site1':{'success':[list(site_mac_name['site1'].keys())[0]], 'error':[]}, 'task' :'assign ap'}
+
+def test_NameAPTask_creates_device_jsons_and_pushes_to_handler(static_site_mac_name, name_association):
+    handler = FakeAPIHandler()
+    name_ap_task = tasks.NameAPTask(static_site_mac_name, name_association, handler)
+    response = name_ap_task.perform_task()
+    assert response == {'site0':{'success':[['site0-ap-01','mac0']], 'error':[]}, 'site1':{'success':[['site1-ap-01','mac1']], 'error':[]}, 'task':'name ap'}
