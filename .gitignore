@@ -2,6 +2,7 @@
 /src/local_runner.py
 __pycache__
 /Sentara
+/dev
 *.xlsx
 *.csv
 *.yml

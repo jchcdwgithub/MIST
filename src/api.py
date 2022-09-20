@@ -159,9 +159,9 @@ class MistAPIHandler:
 
         return self._action_api_endpoint('device_config', [site_id, device_id], call_body=device_info, action='put')
 
-    def get_inventory(self, org_id:str) -> Dict[str,str]:
+    def get_inventory(self, org_id:str = '') -> Dict[str,str]:
 
-        return self._action_api_endpoint('inventory',[org_id])
+        return self._action_api_endpoint('inventory',[org_id if org_id != '' else self.org_id])
 
     def add_inventory_to_org(self, org_id:str, inventory_info:Dict[str,str]) -> Dict[str,str]:
         """

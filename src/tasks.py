@@ -1,8 +1,8 @@
-from api import MistAPIHandler
 import inventory_devices
 import re
 import pandas
 import os
+from api import MistAPIHandler
 from file_ops import ExcelReader, ConfigReader
 from typing import List, Tuple, Dict
 
@@ -17,7 +17,7 @@ class NameAssoc:
     def __init__(self, config:Dict):
         self.config_sites = config['sites']
     
-    def get_data_structure(self) -> Tuple[str, Dict[str, str]]:
+    def get_data_structure(self) ->  Dict[str, str]:
         site_key_regex = re.compile(r'site\d+')
         name_association = {}
         for key in self.config_sites:
@@ -65,7 +65,7 @@ class SiteMacName:
                 if inventory_devices.is_valid_mac(ap_mac):
                     self.site_mac_name[name_wo_floor][ap_mac.lower()] = ap_name
                 else:
-                    print('Found invalid mac for ap {}'.format(ap_name))
+                    print('Found invalid mac for ap {}: {}'.format(ap_name, ap_mac))
         return self.site_mac_name
     
     def _remove_floor_from_site_name(self, site:str) -> str:
@@ -81,6 +81,7 @@ class SiteMacName:
         return 'site_mac_name'
 
 class AssignTask:
+
     def __init__(self, site_mac_name:Dict, site_name_to_id:Dict[str, str], name_association:Dict[str,str], handler:MistAPIHandler):
         self.smn = self._convert_site_mac_dict_to_tuples(site_mac_name)
         self.sn_id = site_name_to_id
@@ -163,7 +164,12 @@ class TaskManager:
         'name ap' : [NameAssoc, SiteMacName],
     }
 
-    def __init__(self, config:Dict):
+    task_headers = {
+        'assign ap' : ['MAC'],
+        'name ap' : ['AP Name', 'MAC']
+    }
+
+    def __init__(self, config:Dict, handler):
         username = config['login']['username']
         password = config['login']['password']
         login_params = {
@@ -172,9 +178,11 @@ class TaskManager:
             }
         self.config = config
         self.tasks = config['sites']['tasks']
-        self.handler = MistAPIHandler('usr_pw', login_params)
+        self.handler = handler('usr_pw', login_params)
         self.handler.save_org_id_by_name(config['org'])
         self.handler.populate_site_id_dict()
+        self.org_inventory = self.handler.get_inventory()
+        self.inventory_macs = {device['mac'] for device in self.org_inventory}
         self.site_name_to_id = self.handler.sites
         self._create_data_structures()
 
@@ -187,6 +195,34 @@ class TaskManager:
                     concrete_obj = object(self.config)
                     data_structures[str(concrete_obj)] = concrete_obj.get_data_structure()
         self.data_structures = data_structures
+    
+    def _validate_data_structures(self):
+        for data_structure in self.data_structures:
+            if data_structure == 'site_mac_name':
+                validated_ds = self._validate_site_mac_name_ds(self.data_structures[data_structure])
+                self.data_structures[data_structure] = validated_ds
+            else:
+                pass
+
+    def _validate_site_mac_name_ds(self, ds:Dict) -> Dict:
+        """ Remove devices that were already assigned to sites previously. """
+        excel_base_name = '{}.xlsx'
+        for site in ds:
+            mist_site_name = self.data_structures['name_association'][site]
+            site_id = self.site_name_to_id[mist_site_name]
+            saved_filename = excel_base_name.format(site_id)
+            try:
+                    df = pandas.read_excel(saved_filename)
+                    assigned_macs = df['mac'].values.tolist()
+                    mac_to_name = ds[site]
+                    mac_to_name_copy = mac_to_name.copy()
+                    for mac in mac_to_name:
+                        if mac in assigned_macs:
+                            mac_to_name_copy.pop(mac)
+                    ds[site] = mac_to_name_copy
+                    return ds
+            except FileNotFoundError:
+                return ds
 
     def create_tasks(self):
         self.execute_queue = []
@@ -212,19 +248,17 @@ class TaskManager:
                 if key != 'task':
                     site_name = key
                     out_filename = f'{site_name}.xlsx'
-                    if sheet_name == 'assign ap':
-                        success = result[site_name]['success']
-                        dataframe = pandas.DataFrame(data=success, columns=['MAC'])
-                        self.write_dataframe_to_worksheet(sheet_name, dataframe, out_filename)
-                    elif sheet_name == 'name ap':
-                        success = result[site_name]['success']
-                        dataframe = pandas.DataFrame(data=success, columns=['Name', 'MAC'])
-                        self.write_dataframe_to_worksheet(sheet_name, dataframe, out_filename)
-    
+                    success_data = result[site_name]['success']
+                    if sheet_name not in self.task_headers:
+                        raise ValueError(f"Unsupported task: {sheet_name}")
+                    else:
+                        self.write_success_data_to_worksheet(sheet_name, success_data, out_filename)
+
     def file_exists(self, filename:str) -> bool:
         return filename in os.listdir(os.getcwd())
     
-    def write_dataframe_to_worksheet(self, sheet_name:str, dataframe:pandas.DataFrame, out_filename:str):
+    def write_success_data_to_worksheet(self, sheet_name:str, success_data:List, out_filename:str):
+        dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])
         if self.file_exists(out_filename):
             with pandas.ExcelWriter(out_filename, mode='a', if_sheet_exists='overlay') as writer:
                 dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)

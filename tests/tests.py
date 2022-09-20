@@ -4,12 +4,14 @@ import inventory_devices
 import tasks
 import pytest
 import random
+import pandas
+import os
 from typing import Dict, List
 
 
 class FakeAPIHandler:
 
-    def __init__(self):
+    def __init__(self, username:str='', password:str=''):
         self.data = []
         self.sites = {
             'site0' : 'id0',
@@ -19,6 +21,8 @@ class FakeAPIHandler:
             'id0' : [ {'id': 'dev_id0', 'mac':'mac0'}],
             'id1' : [ {'id' : 'dev_id1', 'mac':'mac1'}]
         }
+        self.username = username
+        self.password = password
     
     def assign_inventory_to_site(self, request_body:Dict) -> Dict:
         self.data.append(request_body)
@@ -40,6 +44,18 @@ class FakeAPIHandler:
 
     def get_site_devices(self, site_id:str) -> Dict:
         return self.site_devices[site_id] 
+    
+    def save_org_id_by_name(self, org_name:str):
+        self.org_id = '001'
+    
+    def populate_site_id_dict(self):
+        pass
+
+    def get_inventory(self):
+        self.org_inventory = [
+            {'mac':f'mac{num}'} for num in range(5)
+        ]
+        return self.org_inventory
 
 def generate_random_mac():
     mac = ''
@@ -83,6 +99,27 @@ def name_association() -> Dict[str, str]:
         'site0' : 'site0',
         'site1' : 'site1'
     }
+
+@pytest.fixture
+def create_temp_site_excel() -> str:
+    test_macs = ['aabbccddeef1', 'aabbccddeef2']
+    df = pandas.DataFrame(data=test_macs, columns=['mac'])
+    df.to_excel('site01.xlsx', index=False)
+    yield 'id1.xlsx'
+    os.remove('id1.xlsx')
+
+@pytest.fixture
+def create_temp_excel_data() -> str:
+    test_data = [['site1 Flr-01', 'aabbccddeef1', 'ap-1'],
+                 ['site1 Flr-01', 'aabbccddeef0', 'ap-0'],
+                 ['site1 Flr-01', 'aabbccddeef2', 'ap-2'],
+                 ['site1 Flr-01', 'aabbccddeef3', 'ap-3'],
+                 ['site1 Flr-02', 'aabbccddeef4', 'ap-4']
+    ] 
+    df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name'])
+    df.to_excel('test_data.xlsx', index=False, sheet_name='test')
+    yield 'test_data.xlsx'
+    os.remove('test_data.xlsx')
 
 def test_remove_floor_from_site_name_removes_floor():
     test_data = 'SCP MAB Flr-1'
@@ -209,3 +246,40 @@ def test_NameAPTask_creates_device_jsons_and_pushes_to_handler(static_site_mac_n
     name_ap_task = tasks.NameAPTask(static_site_mac_name, name_association, handler)
     response = name_ap_task.perform_task()
     assert response == {'site0':{'success':[['site0-ap-01','mac0']], 'error':[]}, 'site1':{'success':[['site1-ap-01','mac1']], 'error':[]}, 'task':'name ap'}
+
+def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_mac_name_dict(create_temp_site_excel, create_temp_excel_data):
+    expected = {
+        'site1' : {
+            'aabbccddeef3' : 'ap-3',
+            'aabbccddeef4' : 'ap-4',
+            'aabbccddeef0' : 'ap-0'
+        }
+    }
+    config = {
+        'org' : 'org',
+        'sites' : {
+            'ap_excel_file' : create_temp_excel_data,
+            'sheet_name' : 'test',
+            'header_column_names': {
+                'site' : 'Site\nBld\nFloor',
+                'ap_name' : 'New WAP Name',
+                'ap_mac' : 'New WAP \nMAC Address'
+            },
+            'dropna_header' : 'New WAP \nMAC Address',
+            'groupby' : 'Site\nBld\nFloor',
+            'site1' : {
+                'name' : 'site1'
+            },
+            'tasks' : [
+                'assign ap'
+            ]
+        },
+        'login' : {
+            'username' : 'username',
+            'password' : 'password'
+        }
+     }
+    task_manager = tasks.TaskManager(config, FakeAPIHandler)
+    print(task_manager.site_name_to_id)
+    task_manager._validate_data_structures()
+    assert expected == task_manager.data_structures['site_mac_name']
