@@ -141,9 +141,10 @@ def create_temp_site_excel() -> str:
 def create_temp_excel_data() -> str:
     test_data = [[f'site1 Flr-0{num}', f'aabbccddeef{num}', f'ap-{num}'] for num in range(5)] 
     df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name'])
-    df.to_excel('test_data.xlsx', index=False, sheet_name='test')
-    yield 'test_data.xlsx'
-    os.remove('test_data.xlsx')
+    full_path = os.path.join(os.getcwd(), 'data', 'test_data.xlsx')
+    df.to_excel(full_path, index=False, sheet_name='test')
+    yield full_path
+    os.remove(full_path)
 
 def test_remove_floor_from_site_name_removes_floor():
     test_data = 'SCP MAB Flr-1'
@@ -303,14 +304,14 @@ def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_ma
             'password' : 'password'
         }
      }
-    task_manager = tasks.TaskManager(config, FakeAPIHandler)
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler)
     task_manager._validate_data_structures()
     assert expected == task_manager.data_structures['site_mac_name']
 
 def test_create_tasks_adds_assign_task_object_to_execute_queue(create_temp_excel_data):
     config = get_test_config_data()
     config['sites']['ap_excel_file'] = create_temp_excel_data
-    task_manager = tasks.TaskManager(config, FakeAPIHandler)
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler)
     task_manager.create_tasks()
     assign_task = task_manager.execute_queue[0]
     assert isinstance(assign_task, tasks.AssignTask)
@@ -358,3 +359,14 @@ def test_ExcelWriter_creates_file_with_site_id_and_ap_name_to_mac_for_successful
     assert [[f'aabbccddeef{num}', f'ap-{num}'] for num in range(5)] == file_contents
 
     os.remove(file_path)
+
+def test_TaskManager_executes_tasks_in_correct_order(create_temp_excel_data):
+    config = get_test_config_data()
+    config['sites']['ap_excel_file'] = create_temp_excel_data
+    config['sites']['tasks'].append('name ap')
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler, writer=file_ops.ExcelWriter)
+    task_manager.create_tasks()
+    task_manager.execute_tasks()
+    expected = ['assign ap', 'name ap']
+    generated = [result['task'] for result in task_manager.results]
+    assert expected == generated 

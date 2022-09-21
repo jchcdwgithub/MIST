@@ -3,7 +3,7 @@ import re
 import pandas
 import os
 from api import MistAPIHandler
-from file_ops import ExcelReader, ConfigReader
+from file_ops import ExcelReader, ConfigReader, ExcelWriter
 from typing import List, Tuple, Dict
 
 config_reader = ConfigReader('config.yml')
@@ -164,7 +164,7 @@ class TaskManager:
         'name ap' : [NameAssoc, SiteMacName],
     }
 
-    def __init__(self, config:Dict, handler):
+    def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None):
         username = config['login']['username']
         password = config['login']['password']
         login_params = {
@@ -174,12 +174,14 @@ class TaskManager:
         self.config = config
         self.tasks = config['sites']['tasks']
         self.handler = handler('usr_pw', login_params)
+        self.writer = writer
+
         self.handler.save_org_id_by_name(config['org'])
         self.handler.populate_site_id_dict()
-        self.org_inventory = self.handler.get_inventory()
-        self.inventory_macs = {device['mac'] for device in self.org_inventory}
+
         self.site_name_to_id = self.handler.sites
         self._create_data_structures()
+        self._validate_data_structures()
 
     def _create_data_structures(self):
         data_objects = [] 
@@ -206,7 +208,7 @@ class TaskManager:
             mist_site_name = self.data_structures['name_association'][site]
             site_id = self.site_name_to_id[mist_site_name]
             saved_filename = os.path.join(os.getcwd(), 'data', excel_base_name.format(site_id))
-            try:
+            if os.path.exists(saved_filename):
                     df = pandas.read_excel(saved_filename)
                     assigned_macs = df['mac'].values.tolist()
                     mac_to_name = ds[site]
@@ -215,9 +217,7 @@ class TaskManager:
                         if mac in assigned_macs:
                             mac_to_name_copy.pop(mac)
                     ds[site] = mac_to_name_copy
-                    return ds
-            except FileNotFoundError:
-                return ds
+            return ds
 
     def create_tasks(self):
         self.execute_queue = []
@@ -237,25 +237,5 @@ class TaskManager:
             self.results.append(result)
 
     def save_success_configs_to_file(self):
-        for result in self.results:
-            sheet_name = result['task']
-            for key in result:
-                if key != 'task':
-                    site_name = key
-                    out_filename = f'{site_name}.xlsx'
-                    success_data = result[site_name]['success']
-                    if sheet_name not in self.task_headers:
-                        raise ValueError(f"Unsupported task: {sheet_name}")
-                    else:
-                        self.write_success_data_to_worksheet(sheet_name, success_data, out_filename)
-
-    def file_exists(self, filename:str) -> bool:
-        return filename in os.listdir(os.getcwd())
-    
-    def write_success_data_to_worksheet(self, sheet_name:str, success_data:List, out_filename:str):
-        dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])
-        if self.file_exists(out_filename):
-            with pandas.ExcelWriter(out_filename, mode='a', if_sheet_exists='overlay') as writer:
-                dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)
-        else:
-            dataframe.to_excel(out_filename, sheet_name=sheet_name, index=False)
+        self.writer = self.writer(self.results, self.site_name_to_id)
+        self.writer.write_success_configs_to_file()
