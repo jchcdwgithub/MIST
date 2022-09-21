@@ -164,11 +164,6 @@ class TaskManager:
         'name ap' : [NameAssoc, SiteMacName],
     }
 
-    task_headers = {
-        'assign ap' : ['MAC'],
-        'name ap' : ['AP Name', 'MAC']
-    }
-
     def __init__(self, config:Dict, handler):
         username = config['login']['username']
         password = config['login']['password']
@@ -210,7 +205,7 @@ class TaskManager:
         for site in ds:
             mist_site_name = self.data_structures['name_association'][site]
             site_id = self.site_name_to_id[mist_site_name]
-            saved_filename = excel_base_name.format(site_id)
+            saved_filename = os.path.join(os.getcwd(), 'data', excel_base_name.format(site_id))
             try:
                     df = pandas.read_excel(saved_filename)
                     assigned_macs = df['mac'].values.tolist()

@@ -2,6 +2,7 @@ from typing import Dict, List
 import pandas
 import yaml
 import re
+import os
 
 class IOReader:
     def __init__(self, file:str):
@@ -74,3 +75,33 @@ class Writer:
                 for ap_mac in error:
                     lines.append(f'{ap_mac}\n')
                 unassigned_aps_f.writelines(unassigned_lines)
+
+class ExcelWriter:
+
+    task_headers = {
+        'assign ap' : ['MAC'],
+        'name ap' : ['AP Name', 'MAC']
+    }
+
+    def __init__(self, results:Dict, site_name_to_id:Dict):
+        self.results = results
+        self.sn_to_id = site_name_to_id
+
+    def write_success_configs_to_file(self):
+        for result in self.results:
+            sheet_name = result['task']
+            for key in result:
+                if key != 'task':
+                    site_name = key
+                    out_filename = f'{site_name}.xlsx'
+                    full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
+                    success_data = result[site_name]['success']
+                    self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)
+
+    def write_success_data_to_worksheet(self, sheet_name:str, success_data:List, out_filename:str):
+        dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])
+        if os.path.exists(out_filename):
+            with pandas.ExcelWriter(out_filename, mode='a', if_sheet_exists='overlay') as writer:
+                dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)
+        else:
+            dataframe.to_excel(out_filename, sheet_name=sheet_name, index=False)
