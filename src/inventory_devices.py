@@ -59,13 +59,14 @@ def create_site_to_ap_name_mac_from_dataframe(dataframe:pandas.DataFrame, header
     return site_mac_name
 
 def remove_floor_from_site_name(site:str) -> str:
-    floor = re.compile(r'Flr-\d+$')
-    floor_match = floor.search(site)
-    if not floor_match:
-        raise ValueError('Site does not conform to SITE Flr-xx format.')
-    else:
-        start = floor_match.start()
-        return site[:start-1]
+    site_formats = ['Flr-\d+$', '\d(st|nd|rd|th) Flr']
+    for site_format in site_formats:
+        floor = re.compile(r''+site_format)
+        floor_match = floor.search(site)
+        if floor_match:
+            start = floor_match.start()
+            return site[:start-1]
+    raise ValueError('Site does not conform to SITE Flr-xx format.')
 
 def create_assign_json(site:Tuple[str, Dict[str, str]], site_name_to_id:Dict[str, str], name_association:Dict[str, str] = None) -> Dict:
     """

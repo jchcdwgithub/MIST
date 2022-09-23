@@ -370,3 +370,9 @@ def test_TaskManager_executes_tasks_in_correct_order(create_temp_excel_data):
     expected = ['assign ap', 'name ap']
     generated = [result['task'] for result in task_manager.results]
     assert expected == generated 
+
+def test_remove_floor_from_site_name_matches_on_nam_num_cardinal_Flr_format():
+    test_strs = ['Test Site 1st Flr', 'Test Site 2nd Flr', 'Test Site 3rd Flr', 'Test Site 5th Flr']
+    expected = ['Test Site' for _ in range(len(test_strs))]
+    generated = [inventory_devices.remove_floor_from_site_name(test_str) for test_str in test_strs]
+    assert expected == generated

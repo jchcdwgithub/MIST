@@ -69,13 +69,14 @@ class SiteMacName:
         return self.site_mac_name
     
     def _remove_floor_from_site_name(self, site:str) -> str:
-        floor = re.compile(r'Flr-\d+$')
-        floor_match = floor.search(site)
-        if not floor_match:
-            raise ValueError('Site does not conform to SITE Flr-xx format.')
-        else:
-            start = floor_match.start()
-            return site[:start-1]
+        site_formats = ['Flr-\d+$', '\d(st|nd|rd|th) Flr']
+        for site_format in site_formats:
+            floor = re.compile(r''+site_format)
+            floor_match = floor.search(site)
+            if floor_match:
+                start = floor_match.start()
+                return site[:start-1]
+        raise ValueError('Site does not conform to SITE Flr-xx format.')
 
     def __str__(self):
         return 'site_mac_name'
@@ -99,9 +100,10 @@ class AssignTask:
                 assign_jsons.append(assign_json)
             except KeyError:
                 pass
-
+        
         for assign_json,site in zip(assign_jsons, self.smn):
             sites[site[0]] = {'success':[], 'error':[]}
+            print(f'assigning APs to site: {site}')
             try:
                 response = self.handler.assign_inventory_to_site(assign_json)
                 sites[site[0]]['success'] = response['success']
@@ -129,6 +131,7 @@ class NameAPTask:
         id_to_name = {}
         results = {'task':'name ap'}
         for site in self.smn:
+            print('naming APs')
             site_id = self.handler.sites[self.name_assoc[site]]
             results[site] = {'success':[], 'error':[]}
             try:
@@ -173,6 +176,8 @@ class TaskManager:
             }
         self.config = config
         self.tasks = config['sites']['tasks']
+
+        print('logging in...')
         self.handler = handler('usr_pw', login_params)
         self.writer = writer
 
@@ -180,7 +185,9 @@ class TaskManager:
         self.handler.populate_site_id_dict()
 
         self.site_name_to_id = self.handler.sites
+        print('reading information from excel file...')
         self._create_data_structures()
+        print('validating information...')
         self._validate_data_structures()
 
     def _create_data_structures(self):
@@ -190,7 +197,11 @@ class TaskManager:
             for object in self.task_datastructure[task]:
                 if str(object) not in data_objects:
                     concrete_obj = object(self.config)
-                    data_structures[str(concrete_obj)] = concrete_obj.get_data_structure()
+                    try:
+                        data_structures[str(concrete_obj)] = concrete_obj.get_data_structure()
+                    except Exception as e:
+                        print(f'Failed in creating {str(object)} data structure: {e}. Aborting...')
+                        exit()
         self.data_structures = data_structures
     
     def _validate_data_structures(self):
@@ -198,8 +209,17 @@ class TaskManager:
             if data_structure == 'site_mac_name':
                 validated_ds = self._validate_site_mac_name_ds(self.data_structures[data_structure])
                 self.data_structures[data_structure] = validated_ds
+                ds_without_unknown_sites = self._remove_unknown_sites(self.data_structures[data_structure])
+                self.data_structures[data_structure] = ds_without_unknown_sites
             else:
                 pass
+    
+    def _remove_unknown_sites(self, ds:Dict) -> Dict:
+        ds_copy = ds.copy()
+        for site in ds:
+            if not site in self.data_structures['name_association']:
+                ds_copy.pop(site)
+        return ds_copy
 
     def _validate_site_mac_name_ds(self, ds:Dict) -> Dict:
         """ Remove devices that were already assigned to sites previously. """

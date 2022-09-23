@@ -102,6 +102,9 @@ class ExcelWriter:
         dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])
         if os.path.exists(out_filename):
             with pandas.ExcelWriter(out_filename, mode='a', if_sheet_exists='overlay') as writer:
-                dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)
+                if sheet_name in writer.sheets:
+                    dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)
+                else:
+                    dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
         else:
             dataframe.to_excel(out_filename, sheet_name=sheet_name, index=False)
