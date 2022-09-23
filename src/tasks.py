@@ -230,7 +230,7 @@ class TaskManager:
             saved_filename = os.path.join(os.getcwd(), 'data', excel_base_name.format(site_id))
             if os.path.exists(saved_filename):
                     df = pandas.read_excel(saved_filename)
-                    assigned_macs = df['mac'].values.tolist()
+                    assigned_macs = df['MAC'].values.tolist()
                     mac_to_name = ds[site]
                     mac_to_name_copy = mac_to_name.copy()
                     for mac in mac_to_name:

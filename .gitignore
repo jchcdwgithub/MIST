@@ -6,4 +6,4 @@ __pycache__
 /dev
 *.xlsx
 *.csv
-*.yml
+/config.yml
