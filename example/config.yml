@@ -1,0 +1,22 @@
+org: 'Your Org Name'
+sites:
+    ap_excel_file: 'path\to\excel\file.xlsx'
+    sheet_name: 'sheet where config data is found'
+    header_column_names:
+        site: 'Site\nBld\nFloor'
+        ap_name: 'New WAP Name'
+        ap_mac: 'New WAP \nMAC Address'
+    dropna_header: 'New WAP \nMAC Address'
+    groupby: 'Site\nBld\nFloor'
+    site:
+        name: 'Mist Dashboard configured Site Name'
+        excel_name: 'Name on sheet without floor suffix'
+    site:
+        name: 'Another site name'
+        excel_name: 'Site name on sheet without floor suffix'
+    tasks:
+        - 'assign ap'
+        - 'name ap'
+login:
+    username: 'username'
+    password: 'password'
