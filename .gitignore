@@ -1,5 +1,6 @@
 /config
 /src/local_runner.py
+/src/test_runner.py
 __pycache__
 /Sentara
 /dev

@@ -103,7 +103,7 @@ class AssignTask:
         
         for assign_json,site in zip(assign_jsons, self.smn):
             sites[site[0]] = {'success':[], 'error':[]}
-            print(f'assigning APs to site: {site}')
+            print(f'assigning APs to site: {self.name_assoc[site[0]]}')
             try:
                 response = self.handler.assign_inventory_to_site(assign_json)
                 sites[site[0]]['success'] = response['success']

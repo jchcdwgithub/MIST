@@ -133,7 +133,7 @@ def create_temp_site_excel() -> str:
     test_macs = ['aabbccddeef1', 'aabbccddeef2']
     df = pandas.DataFrame(data=test_macs, columns=['mac'])
     full_file_path = os.path.join(os.getcwd(), 'data', 'id1.xlsx')
-    df.to_excel(full_file_path, index=False)
+    df.to_excel(full_file_path, index=False, sheet_name='assign ap')
     yield full_file_path
     os.remove(full_file_path)
 
@@ -375,4 +375,21 @@ def test_remove_floor_from_site_name_matches_on_nam_num_cardinal_Flr_format():
     test_strs = ['Test Site 1st Flr', 'Test Site 2nd Flr', 'Test Site 3rd Flr', 'Test Site 5th Flr']
     expected = ['Test Site' for _ in range(len(test_strs))]
     generated = [inventory_devices.remove_floor_from_site_name(test_str) for test_str in test_strs]
+    assert expected == generated
+
+def test_ExcelWriter_writes_only_unique_values_to_worksheet(create_temp_site_excel):
+    test_data = [
+        {
+        'task' : 'assign ap',
+        'site1': { 
+        'success' :[f'aabbccddeef{num}' for num in range(1,5)],
+        'error': []
+               }
+        }
+    ]
+
+    expected = [f'aabbccddeef{num}' for num in range(1, 5)]
+    writer = file_ops.ExcelWriter(test_data, {'site1':'id1'})
+    writer.write_success_configs_to_file()
+    generated = pandas.read_excel(create_temp_site_excel)['mac'].values.tolist()
     assert expected == generated

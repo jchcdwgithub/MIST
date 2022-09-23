@@ -93,7 +93,7 @@ class ExcelWriter:
             for key in result:
                 if key != 'task':
                     site_name = key
-                    out_filename = f'{site_name}.xlsx'
+                    out_filename = f'{self.sn_to_id[site_name]}.xlsx'
                     full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
                     success_data = result[site_name]['success']
                     self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)
@@ -103,7 +103,16 @@ class ExcelWriter:
         if os.path.exists(out_filename):
             with pandas.ExcelWriter(out_filename, mode='a', if_sheet_exists='overlay') as writer:
                 if sheet_name in writer.sheets:
-                    dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None)
+                    current_df = pandas.read_excel(out_filename, sheet_name=sheet_name)
+                    current_values = current_df.values.tolist()
+                    column_names = current_df.columns.values.tolist() 
+                    to_write_values = dataframe.values.tolist()
+                    new_values = to_write_values.copy()
+                    for value in to_write_values:
+                        if value in current_values:
+                            new_values.remove(value)
+                    dataframe = pandas.DataFrame(data=new_values, columns=column_names)
+                    dataframe.to_excel(writer, sheet_name=sheet_name, startrow=writer.sheets[sheet_name].max_row, header=None, index=False)
                 else:
                     dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
         else:
