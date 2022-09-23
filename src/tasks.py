@@ -257,5 +257,5 @@ class TaskManager:
             self.results.append(result)
 
     def save_success_configs_to_file(self):
-        self.writer = self.writer(self.results, self.site_name_to_id)
+        self.writer = self.writer(self.results, self.site_name_to_id, self.data_structures['name_association'])
         self.writer.write_success_configs_to_file()

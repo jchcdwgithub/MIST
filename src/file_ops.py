@@ -83,9 +83,10 @@ class ExcelWriter:
         'name ap' : ['AP Name', 'MAC']
     }
 
-    def __init__(self, results:Dict, site_name_to_id:Dict):
+    def __init__(self, results:Dict, site_name_to_id:Dict, name_association:Dict[str, str]):
         self.results = results
         self.sn_to_id = site_name_to_id
+        self.name_assoc = name_association
 
     def write_success_configs_to_file(self):
         for result in self.results:
@@ -93,7 +94,7 @@ class ExcelWriter:
             for key in result:
                 if key != 'task':
                     site_name = key
-                    out_filename = f'{self.sn_to_id[site_name]}.xlsx'
+                    out_filename = f'{self.sn_to_id[self.name_assoc[site_name]]}.xlsx'
                     full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
                     success_data = result[site_name]['success']
                     self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)

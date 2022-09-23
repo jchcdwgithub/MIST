@@ -329,9 +329,9 @@ def test_ExcelWriter_creates_file_with_site_id_and_macs_for_successful_assign_ta
         'error' : []
         }
     }]
-    excel_writer = file_ops.ExcelWriter(test_data, {'site1', 'id1'})
+    excel_writer = file_ops.ExcelWriter(test_data, {'site1': 'id1'},{'site1':'site1'})
     excel_writer.write_success_configs_to_file()
-    file_path = os.path.join(os.getcwd(), 'data', 'site1.xlsx')
+    file_path = os.path.join(os.getcwd(), 'data', 'id1.xlsx')
     assert os.path.exists(file_path)
     
     file_contents = pandas.read_excel(file_path, sheet_name='assign ap')['MAC'].values.tolist()
@@ -350,9 +350,9 @@ def test_ExcelWriter_creates_file_with_site_id_and_ap_name_to_mac_for_successful
         }
     }]
 
-    excel_writer = file_ops.ExcelWriter(test_data, {'site1', 'id1'})
+    excel_writer = file_ops.ExcelWriter(test_data, {'site1': 'id1'}, {'site1':'site1'})
     excel_writer.write_success_configs_to_file()
-    file_path = os.path.join(os.getcwd(), 'data', 'site1.xlsx')
+    file_path = os.path.join(os.getcwd(), 'data', 'id1.xlsx')
     assert os.path.exists(file_path)
 
     file_contents = pandas.read_excel(file_path, sheet_name='name ap').values.tolist()
@@ -389,7 +389,7 @@ def test_ExcelWriter_writes_only_unique_values_to_worksheet(create_temp_site_exc
     ]
 
     expected = [f'aabbccddeef{num}' for num in range(1, 5)]
-    writer = file_ops.ExcelWriter(test_data, {'site1':'id1'})
+    writer = file_ops.ExcelWriter(test_data, {'site1':'id1'}, {'site1':'site1'})
     writer.write_success_configs_to_file()
     generated = pandas.read_excel(create_temp_site_excel)['mac'].values.tolist()
     assert expected == generated
