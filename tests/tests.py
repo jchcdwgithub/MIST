@@ -92,7 +92,8 @@ def get_test_config_data() -> Dict:
             },
             'tasks' : [
                 'assign ap'
-            ]
+            ],
+            'lowercase_ap_names':False
         },
         'login' : {
             'username' : 'username',
@@ -105,6 +106,20 @@ def site_mac_name() -> Dict[str, Dict[str,str]]:
     return {
         'site0' : { generate_random_mac() : 'site0-ap-01' },
         'site1' : { generate_random_mac() : 'site1-ap-01'}
+    }
+
+@pytest.fixture
+def site_to_mac() -> Dict[str, List[str]]:
+    return {
+        'site0' : [generate_random_mac()],
+        'site1' : [generate_random_mac()]
+    }
+
+@pytest.fixture
+def static_site_to_mac() -> Dict[str, List[str]]:
+    return {
+        'site0' : ['mac0'],
+        'site1' : ['mac1']
     }
 
 @pytest.fixture
@@ -131,15 +146,29 @@ def name_association() -> Dict[str, str]:
 @pytest.fixture
 def create_temp_site_excel() -> str:
     test_macs = ['aabbccddeef1', 'aabbccddeef2']
-    df = pandas.DataFrame(data=test_macs, columns=['mac'])
+    df = pandas.DataFrame(data=test_macs, columns=['MAC'])
     full_file_path = os.path.join(os.getcwd(), 'data', 'id1.xlsx')
-    df.to_excel(full_file_path, index=False, sheet_name='assign ap')
+    with pandas.ExcelWriter(full_file_path) as writer:
+        df = pandas.DataFrame(data=test_macs, columns=['MAC'])
+        df.to_excel(writer, index=False, sheet_name='assign ap')
+        test_mac_names = [['aabbccddeef1', 'ap-1'], ['aabbccddeef2', 'ap-2']]
+        df = pandas.DataFrame(data=test_mac_names, columns=['MAC', 'NAME'])
+        df.to_excel(writer, sheet_name='name ap', index=False)
     yield full_file_path
     os.remove(full_file_path)
 
 @pytest.fixture
 def create_temp_excel_data() -> str:
     test_data = [[f'site1 Flr-0{num}', f'aabbccddeef{num}', f'ap-{num}'] for num in range(5)] 
+    df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name'])
+    full_path = os.path.join(os.getcwd(), 'data', 'test_data.xlsx')
+    df.to_excel(full_path, index=False, sheet_name='test')
+    yield full_path
+    os.remove(full_path)
+
+@pytest.fixture
+def create_temp_excel_data_uppercase_names() -> str:
+    test_data = [[f'site1 Flr-0{num}', f'aabbccddeef{num}', f'AP-{num}'] for num in range(5)] 
     df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name'])
     full_path = os.path.join(os.getcwd(), 'data', 'test_data.xlsx')
     df.to_excel(full_path, index=False, sheet_name='test')
@@ -260,11 +289,11 @@ def test_create_name_association_dict_creates_name_to_name_associations_when_onl
     generated = inventory_devices.create_name_association_dict(test_data)
     assert expected == generated
 
-def test_AssignTask_creates_assign_jsons_and_pushes_to_handler(site_mac_name, site_name_to_id, name_association):
+def test_AssignTask_creates_assign_jsons_and_pushes_to_handler(site_to_mac, site_name_to_id, name_association):
     handler = FakeAPIHandler()
-    assign_task = tasks.AssignTask(site_mac_name, site_name_to_id, name_association, handler)
+    assign_task = tasks.AssignTask(site_to_mac, site_name_to_id, name_association, handler)
     sites = assign_task.perform_task()
-    assert sites == {'site0':{'success':[list(site_mac_name['site0'].keys())[0]], 'error':[]}, 'site1':{'success':[list(site_mac_name['site1'].keys())[0]], 'error':[]}, 'task' :'assign ap'}
+    assert sites == {'site0':{'success':site_to_mac['site0'], 'error':[]}, 'site1':{'success':site_to_mac['site1'], 'error':[]}, 'task' :'assign ap'}
 
 def test_NameAPTask_creates_device_jsons_and_pushes_to_handler(static_site_mac_name, name_association):
     handler = FakeAPIHandler()
@@ -274,11 +303,11 @@ def test_NameAPTask_creates_device_jsons_and_pushes_to_handler(static_site_mac_n
 
 def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_mac_name_dict(create_temp_site_excel, create_temp_excel_data):
     expected = {
-        'site1' : {
-            'aabbccddeef3' : 'ap-3',
-            'aabbccddeef4' : 'ap-4',
-            'aabbccddeef0' : 'ap-0'
-        }
+        'site1' : [
+            'aabbccddeef0',
+            'aabbccddeef3',
+            'aabbccddeef4',
+        ]
     }
     config = {
         'org' : 'org',
@@ -297,7 +326,8 @@ def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_ma
             },
             'tasks' : [
                 'assign ap'
-            ]
+            ],
+            'lowercase_ap_names' : False
         },
         'login' : {
             'username' : 'username',
@@ -306,7 +336,7 @@ def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_ma
      }
     task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler)
     task_manager._validate_data_structures()
-    assert expected == task_manager.data_structures['site_mac_name']
+    assert expected == task_manager.data_structures['site_to_mac']
 
 def test_create_tasks_adds_assign_task_object_to_execute_queue(create_temp_excel_data):
     config = get_test_config_data()
@@ -317,7 +347,7 @@ def test_create_tasks_adds_assign_task_object_to_execute_queue(create_temp_excel
     assert isinstance(assign_task, tasks.AssignTask)
     assert assign_task.order == 0
     assert assign_task.name_assoc == {'site1' : 'site1'}
-    assert assign_task.smn == [('site1', {f'aabbccddeef{num}': f'ap-{num}' for num in range(5)})]
+    assert assign_task.smn == {'site1': [f'aabbccddeef{num}' for num in range(5)]}
 
 def test_ExcelWriter_creates_file_with_site_id_and_macs_for_successful_assign_task():
     test_data = [{
@@ -391,5 +421,40 @@ def test_ExcelWriter_writes_only_unique_values_to_worksheet(create_temp_site_exc
     expected = [f'aabbccddeef{num}' for num in range(1, 5)]
     writer = file_ops.ExcelWriter(test_data, {'site1':'id1'}, {'site1':'site1'})
     writer.write_success_configs_to_file()
-    generated = pandas.read_excel(create_temp_site_excel)['mac'].values.tolist()
+    generated = pandas.read_excel(create_temp_site_excel)['MAC'].values.tolist()
+    assert expected == generated
+
+def test_lowercase_names_in_site_mac_name_changes_ds_names_to_lowercase(create_temp_excel_data_uppercase_names):
+    config = get_test_config_data()
+    config['sites']['ap_excel_file'] = create_temp_excel_data_uppercase_names
+    config['sites']['lowercase_ap_names'] = True
+    config['sites']['tasks'].append('name ap')
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler, writer=file_ops.ExcelWriter)
+    expected = {
+        'site1' : {f'aabbccddeef{num}':f'ap-{num}' for num in range(5)}
+    }
+    generated = task_manager.data_structures['site_mac_name']
+    assert expected == generated
+
+def test_validate_site_mac_name_ds_removes_aps_that_were_already_assigned(create_temp_excel_data, create_temp_site_excel):
+    config = get_test_config_data()
+    config['sites']['ap_excel_file'] = create_temp_excel_data
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler, writer=file_ops.ExcelWriter)
+    expected = {
+        'site1' : [f'aabbccddeef{num}' for num in range(3,5)]
+        }
+    expected['site1'].insert(0, 'aabbccddeef0')
+    generated = task_manager.data_structures['site_to_mac']
+    assert expected == generated
+
+def test_validate_site_to_mac_ds_removes_aps_that_were_already_named(create_temp_excel_data, create_temp_site_excel):
+    config = get_test_config_data()
+    config['sites']['ap_excel_file'] = create_temp_excel_data
+    config['sites']['tasks'] = ['name ap']
+    task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler, writer=file_ops.ExcelWriter)
+    expected = {
+        'site1' : {f'aabbccddeef{num}' : f'ap-{num}' for num in range(3,5)}
+        }
+    expected['site1']['aabbccddeef0'] = 'ap-0'
+    generated = task_manager.data_structures['site_mac_name']
     assert expected == generated
