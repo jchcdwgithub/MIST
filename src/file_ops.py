@@ -1,4 +1,7 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
+from zipfile import ZipFile
+import json
+import shutil
 import pandas
 import yaml
 import re
@@ -118,3 +121,57 @@ class ExcelWriter:
                     dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
         else:
             dataframe.to_excel(out_filename, sheet_name=sheet_name, index=False)
+
+class EkahauWriter:
+
+    def __init__(self, config:Dict):
+        self.config = config
+
+    def replace_ap_names_in_esx_file(self, esx_filepath:str):
+
+        new_esx_filepath = self.copy_esx_file(esx_filepath)
+        esx_old_filepath, esx_new_filepath = self.rename_esx_file(new_esx_filepath)
+        esx_to_final_naming = self.create_ap_naming_dict()
+
+        with ZipFile(esx_new_filepath, 'a') as zf:
+            with zf.open('accessPoints.json') as ap_f:
+                esx_aps = json.loads(ap_f.read()) 
+                ap_name_location = {}
+                for ap in esx_aps['accessPoints']:
+                    if ap['name'] in esx_to_final_naming:
+                        ap['name'] = esx_to_final_naming[ap['name']]
+                        ap_name_location[ap['name']] = {
+                            'location': {
+                                'x': ap['location']['coord']['x'],
+                                'y': ap['location']['coord']['y']
+                            }
+                        }
+            zf.writestr('accessPoints.json', json.dumps(esx_aps)) 
+
+        os.rename(esx_new_filepath, esx_old_filepath)
+
+    def copy_esx_file(self, esx_filepath:str) -> str:
+        
+        old_filename = esx_filepath
+        old_filepath = os.path.join(os.getcwd(), 'Sentara', old_filename)
+        new_filename = old_filename[:len(old_filename)-4] + ' - Copy.esx'
+        new_filepath = os.path.join(os.getcwd(), 'Sentara', new_filename)
+        shutil.copyfile(old_filepath, new_filepath)
+        return new_filepath
+
+    def rename_esx_file(self, esx_filepath:str) -> Tuple[str, str]:
+
+        base_filename = esx_filepath[:len(esx_filepath)-3]
+        esx_old_filepath = base_filename + 'esx'
+        esx_new_filepath = base_filename + 'zip'
+        os.rename(esx_old_filepath, esx_new_filepath)
+        return (esx_old_filepath, esx_new_filepath)
+
+    def create_ap_naming_dict(self) -> Dict[str, str]:
+
+        excel_filepath = self.config['sites']['ap_excel_file']
+        sheet_name = self.config['sites']['sheet_name']
+        df = pandas.read_excel(excel_filepath, sheet_name=sheet_name)
+        df_without_empty_names = df.dropna(subset=['New WAP Name'])
+        values = df_without_empty_names.loc[:,['WAP location #\non Drawing', 'New WAP Name']]
+        return {esx_name:final_name.lower() for esx_name, final_name in values.values.tolist()}
