@@ -83,7 +83,9 @@ class ExcelWriter:
 
     task_headers = {
         'assign ap' : ['MAC'],
-        'name ap' : ['AP Name', 'MAC']
+        'name ap' : ['AP Name', 'MAC'],
+        'rename esx ap': ['Ekahau File'],
+        'create per floor esx files' : ['Files'],
     }
 
     def __init__(self, results:Dict, site_name_to_id:Dict, name_association:Dict[str, str]):
@@ -150,14 +152,12 @@ class EkahauWriter:
 
         os.rename(esx_new_filepath, esx_old_filepath)
 
-    def copy_esx_file(self, esx_filepath:str) -> str:
+    def copy_esx_file(self, esx_filepath:str, new_filename:str='- Copy') -> str:
         
         old_filename = esx_filepath
-        old_filepath = os.path.join(os.getcwd(), 'Sentara', old_filename)
-        new_filename = old_filename[:len(old_filename)-4] + ' - Copy.esx'
-        new_filepath = os.path.join(os.getcwd(), 'Sentara', new_filename)
-        shutil.copyfile(old_filepath, new_filepath)
-        return new_filepath
+        new_filename = old_filename[:len(old_filename)-4] + f' {new_filename}.esx'
+        shutil.copyfile(old_filename, new_filename)
+        return new_filename
 
     def rename_esx_file(self, esx_filepath:str) -> Tuple[str, str]:
 
@@ -175,3 +175,76 @@ class EkahauWriter:
         df_without_empty_names = df.dropna(subset=['New WAP Name'])
         values = df_without_empty_names.loc[:,['WAP location #\non Drawing', 'New WAP Name']]
         return {esx_name:final_name.lower() for esx_name, final_name in values.values.tolist()}
+
+    def get_floorplan_json_from_file(self, esx_filepath:str) -> Dict[str, str]:
+        with ZipFile(esx_filepath) as esx_f:
+            with esx_f.open('floorPlans.json') as floorplan_f:
+                floorplan_json = json.loads(floorplan_f.read())
+                self.floorplan_name_id = floorplan_json
+                return floorplan_json
+
+    def create_floorplan_specific_esx_file(self, esx_filepath:str, floorplan_name:str, floorplan_id:str):
+        esx_with_floorplan_only_filename = f' {floorplan_name}'
+        new_filename = self.copy_esx_file(esx_filepath, esx_with_floorplan_only_filename)
+        with ZipFile(new_filename, 'a') as esx_f:
+            new_ap_json = self.remove_location_info_from_aps_not_on_floorplan(esx_f, floorplan_id)
+            esx_f.writestr('accessPoints.json', json.dumps(new_ap_json)) 
+            new_floorplan_json = self.remove_all_floorplans_except_current_floorplan(esx_f, floorplan_id)
+            esx_f.writestr('floorPlans.json', json.dumps(new_floorplan_json))
+            new_areas_json = self.remove_floorplan_from_areas(esx_f, floorplan_id)
+            esx_f.writestr('areas.json', json.dumps(new_areas_json))
+            new_exc_json = self.remove_floorplan_from_excluded_areas(esx_f, floorplan_id)
+            esx_f.writestr('exclusionAreas.json', json.dumps(new_exc_json))
+            esx_f.writestr('interferers.json', json.dumps({'interferers':[]}))
+            self.remove_surveys_that_reference_current_floorplan(esx_f, new_filename, floorplan_id)
+        os.remove(new_filename)
+
+    def remove_surveys_that_reference_current_floorplan(self, esx_file_handler:ZipFile, new_filename:str, floorplan_id:str):
+        survey_regex = re.compile(r'survey-.*\.json')
+        with ZipFile(new_filename[:len(new_filename)-4]+'_.esx', 'w') as new_file:
+            for item in esx_file_handler.infolist():
+                if (survey_regex.match(item.filename)):
+                    with esx_file_handler.open(item.filename) as survey_f:
+                        survey_json = json.loads(survey_f.read())
+                        for survey in survey_json['surveys']:
+                            if survey['floorPlanId'] == floorplan_id:
+                                new_file.writestr(item, json.dumps(survey_json))
+                else:
+                    buffer = esx_file_handler.read(item.filename)
+                    new_file.writestr(item, buffer)
+
+    def remove_location_info_from_aps_not_on_floorplan(self, esx_file_handler:ZipFile, floorplan_id:str):
+        with esx_file_handler.open('accessPoints.json') as ap_f:
+            ap_json = json.loads(ap_f.read())
+            ap_json_copy = ap_json.copy()
+            for ap in ap_json_copy['accessPoints']:
+                if 'location' in ap and ap['location']['floorPlanId'] != floorplan_id:
+                    ap.pop('location')
+        return ap_json_copy
+
+    def remove_floorplan_from_areas(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
+        with esx_file_handler.open('areas.json') as areas_f:
+            areas_json = json.loads(areas_f.read())
+            new_areas_json = {'areas':[]}
+            for area in areas_json['areas']:
+                if area['floorPlanId'] == floorplan_id:
+                    new_areas_json['areas'].append(area)
+        return new_areas_json
+
+    def remove_floorplan_from_excluded_areas(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
+        with esx_file_handler.open('exclusionAreas.json') as exc_areas_f:
+            exc_areas_json = json.loads(exc_areas_f.read())
+            new_exc_areas_json = {'exclusionAreas':[]}
+            for exc_area in exc_areas_json['exclusionAreas']:
+                if exc_area['floorPlanId'] == floorplan_id:
+                    new_exc_areas_json['exclusionAreas'].append(exc_area)
+        return new_exc_areas_json
+
+    def remove_all_floorplans_except_current_floorplan(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
+        with esx_file_handler.open('floorPlans.json') as floorplan_f:
+            floorplan_json = json.loads(floorplan_f.read())
+            filtered_floorplan = {'floorPlans':[]} 
+            for floorplan in floorplan_json['floorPlans']:
+                if floorplan['id'] == floorplan_id:
+                    filtered_floorplan['floorPlans'].append(floorplan)
+        return filtered_floorplan 

@@ -8,6 +8,8 @@ import pytest
 import random
 import pandas
 import file_ops
+import json
+from zipfile import ZipFile
 from typing import Dict, List
 
 
@@ -174,6 +176,273 @@ def create_temp_excel_data_uppercase_names() -> str:
     df.to_excel(full_path, index=False, sheet_name='test')
     yield full_path
     os.remove(full_path)
+
+@pytest.fixture
+def get_test_ap_data():
+    test_data = {
+  "accessPoints": [
+    {
+      "name": "Measured AP-33:ab",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "tags": [],
+      "id": "b185b285-22cf-4dc2-8033-185950809ce7",
+      "status": "CREATED"
+    },
+    {
+      "name": "vbg2600-n1e-12",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "vendor": "Cisco",
+      "model": "",
+      "tags": [],
+      "id": "6a99621e-db58-401f-ab4c-29e8ae3d835b",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 765.3018727910558,
+          "y": 288.53909480473203
+        }
+      },
+      "name": "AP21",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "bc474aaf-9cd5-4651-9e6c-cff0603ac006"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "8f3a97a6-28e9-4752-92ad-6f00352817a6",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "85222db6-8dcb-4e79-998f-e2416ab44153",
+        "coord": {
+          "x": 565.8025530447351,
+          "y": 650.9133237774099
+        }
+      },
+      "name": "AP072",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "665e40b4-0691-4555-acaf-77d270286ee3"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "f1d7b2b5-9461-49a1-9558-9b0241380dc4",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 685.7095447426987,
+          "y": 456.6705156205836
+        }
+      },
+      "name": "AP36",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "1f64acf0-c90f-4fd7-a465-829f85319e15"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "fb08208f-9ebe-48ac-ae37-33fc52f37aa8",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "85222db6-8dcb-4e79-998f-e2416ab44153",
+        "coord": {
+          "x": 662.1880815804216,
+          "y": 636.8000822415748
+        }
+      },
+      "name": "AP058",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "4ad6864e-7732-4938-94a8-55e4dc41e7e2"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "189990f4-c1fa-4fbf-8580-c56f3c6ebeac",
+      "status": "CREATED"
+    },
+  ]
+    }
+    return test_data
+
+@pytest.fixture
+def get_test_floorplan_data():
+    test_data = {
+        "floorPlans": [
+    {
+      "name": "VBG - Floor 4",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.1543577072585195,
+      "imageId": "a96ea6ca-88a9-48d1-a2a2-0762cff6a8f2",
+      "bitmapImageId": "be3c74b7-c7f7-43f3-a452-dbcc7af37a49",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 30.889724310776955,
+      "cropMinY": 0.0,
+      "cropMaxX": 841.0,
+      "cropMaxY": 595.0,
+      "rotateUpDirection": "LEFT",
+      "tags": [],
+      "id": "ea798325-1bae-4608-b5ec-a137ad3a7dec",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - MOB Floor 4",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.14021459964438093,
+      "imageId": "65f7bf97-e2b3-4a80-a948-298f84cc98a5",
+      "bitmapImageId": "93ca43f3-8d44-4a28-82e6-8c873e36e947",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 295.05012531328316,
+      "cropMinY": 7.456140350877206,
+      "cropMaxX": 533.1679197994987,
+      "cropMaxY": 569.4360902255639,
+      "rotateUpDirection": "LEFT",
+      "tags": [],
+      "id": "93c89f93-040b-4469-ab49-b3c254b197eb",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - Floor 3",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.1682560911697549,
+      "imageId": "faae511b-f49b-4865-a64e-06f6eb05b0a7",
+      "bitmapImageId": "2a1adc17-83e1-45e1-bd7e-0b77318f246e",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 0.0,
+      "cropMinY": 0.0,
+      "cropMaxX": 841.0,
+      "cropMaxY": 595.0,
+      "rotateUpDirection": "RIGHT",
+      "tags": [],
+      "id": "4538b490-edaf-46a0-bf5d-f40d21189307",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - Floor 2",
+      "width": 1132.0,
+      "height": 945.0,
+      "metersPerUnit": 0.25379893534497106,
+      "imageId": "52f16650-a60a-431e-ae0f-448b1d2745cb",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 140.41353383458642,
+      "cropMinY": 42.29323308270676,
+      "cropMaxX": 1110.0075187969924,
+      "cropMaxY": 741.9924812030076,
+      "rotateUpDirection": "UP",
+      "tags": [],
+      "id": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - MOB Floor 1",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.1426063537289941,
+      "imageId": "5c943e97-6126-446d-a2eb-87ce65405737",
+      "bitmapImageId": "3a20edaa-5268-46e9-9fb6-73fd3e15d196",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 303.57142857142844,
+      "cropMinY": 0.0,
+      "cropMaxX": 574.7092731829574,
+      "cropMaxY": 595.0,
+      "rotateUpDirection": "LEFT",
+      "tags": [],
+      "id": "e82611ba-e0d4-4738-b7eb-c3b9357f2c87",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - MOB Floor 2",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.11725714186046168,
+      "imageId": "d6061ff6-277b-48f6-9334-b55d77958093",
+      "bitmapImageId": "5448dc93-a8b9-4854-aa91-aec14d5c1b96",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 291.85463659147865,
+      "cropMinY": 0.0,
+      "cropMaxX": 561.9273182957393,
+      "cropMaxY": 595.0,
+      "rotateUpDirection": "LEFT",
+      "tags": [],
+      "id": "81222b78-c982-4b71-84d4-239b4d6006ed",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - MOB Floor 3",
+      "width": 841.0,
+      "height": 595.0,
+      "metersPerUnit": 0.17205306977658935,
+      "imageId": "872651dc-2593-4d31-a456-59633494d026",
+      "bitmapImageId": "c5e6c60e-a869-497b-b366-64dcce2ebf03",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 361.0902255639097,
+      "cropMinY": 0.0,
+      "cropMaxX": 534.233082706767,
+      "cropMaxY": 595.0,
+      "rotateUpDirection": "LEFT",
+      "tags": [],
+      "id": "9ec73444-e1e0-41b0-a249-8ff98570977e",
+      "status": "CREATED"
+    },
+    {
+      "name": "VBG - Floor 1",
+      "width": 1086.0,
+      "height": 951.0,
+      "metersPerUnit": 0.22020780559313144,
+      "imageId": "4f34c13d-143f-4024-804b-7c0e190e9b2e",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 0.0,
+      "cropMinY": 0.0,
+      "cropMaxX": 1086.0,
+      "cropMaxY": 951.0,
+      "rotateUpDirection": "UP",
+      "tags": [],
+      "id": "85222db6-8dcb-4e79-998f-e2416ab44153",
+      "status": "CREATED"
+    }
+        ]
+    }
+    return test_data
+
+@pytest.fixture
+def create_temp_esx_zip(get_test_ap_data, get_test_floorplan_data):
+    temp_zip = os.path.join(os.getcwd(), 'dev', 'test.zip')
+    with ZipFile(temp_zip, 'w') as zf:
+            zf.writestr('accessPoints.json', json.dumps(get_test_ap_data))
+            zf.writestr('floorPlans.json', json.dumps(get_test_floorplan_data))
+    yield temp_zip
+    os.remove(temp_zip)
 
 def test_remove_floor_from_site_name_removes_floor():
     test_data = 'SCP MAB Flr-1'
@@ -457,4 +726,129 @@ def test_validate_site_to_mac_ds_removes_aps_that_were_already_named(create_temp
         }
     expected['site1']['aabbccddeef0'] = 'ap-0'
     generated = task_manager.data_structures['site_mac_name']
+    assert expected == generated
+
+def test_remove_locations_from_aps_removes_only_designated_floorplan_id(create_temp_esx_zip):
+    esx_writer = file_ops.EkahauWriter(get_test_config_data) 
+    floorplan_id = "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0"
+    expected = { 
+        "accessPoints": [
+    {
+      "name": "Measured AP-33:ab",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "tags": [],
+      "id": "b185b285-22cf-4dc2-8033-185950809ce7",
+      "status": "CREATED"
+    },
+    {
+      "name": "vbg2600-n1e-12",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "vendor": "Cisco",
+      "model": "",
+      "tags": [],
+      "id": "6a99621e-db58-401f-ab4c-29e8ae3d835b",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 765.3018727910558,
+          "y": 288.53909480473203
+        }
+      },
+      "name": "AP21",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "bc474aaf-9cd5-4651-9e6c-cff0603ac006"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "8f3a97a6-28e9-4752-92ad-6f00352817a6",
+      "status": "CREATED"
+    },
+    {
+      "name": "AP072",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "665e40b4-0691-4555-acaf-77d270286ee3"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "f1d7b2b5-9461-49a1-9558-9b0241380dc4",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 685.7095447426987,
+          "y": 456.6705156205836
+        }
+      },
+      "name": "AP36",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "1f64acf0-c90f-4fd7-a465-829f85319e15"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "fb08208f-9ebe-48ac-ae37-33fc52f37aa8",
+      "status": "CREATED"
+    },
+    {
+      "name": "AP058",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "4ad6864e-7732-4938-94a8-55e4dc41e7e2"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "189990f4-c1fa-4fbf-8580-c56f3c6ebeac",
+      "status": "CREATED"
+    },
+  ]
+    }
+    with ZipFile(create_temp_esx_zip) as zf:
+        generated = esx_writer.remove_location_info_from_aps_not_on_floorplan(zf,floorplan_id)
+    assert expected == generated
+
+def test_remove_all_floorplans_except_current_floorplan_keeps_only_current_floorplan(create_temp_esx_zip):
+    esx_writer = file_ops.EkahauWriter(get_test_config_data)
+    floorplan_id = "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0"
+    expected = {
+        "floorPlans": [
+    {
+      "name": "VBG - Floor 2",
+      "width": 1132.0,
+      "height": 945.0,
+      "metersPerUnit": 0.25379893534497106,
+      "imageId": "52f16650-a60a-431e-ae0f-448b1d2745cb",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 140.41353383458642,
+      "cropMinY": 42.29323308270676,
+      "cropMaxX": 1110.0075187969924,
+      "cropMaxY": 741.9924812030076,
+      "rotateUpDirection": "UP",
+      "tags": [],
+      "id": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+      "status": "CREATED"
+    },
+        ]
+    }
+    with ZipFile(create_temp_esx_zip) as zf:
+        generated = esx_writer.remove_all_floorplans_except_current_floorplan(zf, floorplan_id)
     assert expected == generated

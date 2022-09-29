@@ -2,9 +2,15 @@ import inventory_devices
 import re
 import pandas
 import os
+import sys
 from api import MistAPIHandler
-from file_ops import ExcelReader, ConfigReader, ExcelWriter
+from file_ops import EkahauWriter, ExcelReader, ConfigReader, ExcelWriter
 from typing import List, Tuple, Dict
+
+#suppress warnings from writing to ekahau file
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter('ignore')
 
 config_reader = ConfigReader('config.yml')
 config = config_reader.extract_information_from_file()
@@ -228,14 +234,50 @@ class NameAPTask:
             results[site]['error'] = error
         return results
 
+class RenameAPEsxTask:
+
+    def __init__(self, esx_writer:EkahauWriter):
+        self.esx_writer = esx_writer
+        self.order = 2
+
+    def perform_task(self):
+        esx_filepath = self.esx_writer.config['sites']['esx_file']
+        self.esx_writer.replace_ap_names_in_esx_file(esx_filepath)
+        result = {'task':'rename esx ap', esx_filepath : {'success':[esx_filepath], 'error':[]}}
+        return result
+
+class CreatePerFloorEsxFilesTask:
+
+    def __init__(self, esx_writer:EkahauWriter):
+        self.esx_writer = esx_writer
+        self.order = 2
+
+    def perform_task(self):
+        esx_filepath = self.esx_writer.config['sites']['esx_file']
+        esx_copy_filepath = esx_filepath[:len(esx_filepath)-4] + ' - Copy.esx'
+        if os.path.exists(esx_copy_filepath):
+            esx_filepath = esx_copy_filepath
+        floorplans_json = self.esx_writer.get_floorplan_json_from_file(esx_filepath)
+        result = {'task' : 'create per floor esx files'}
+        for floorplan in floorplans_json['floorPlans']:
+            floorplan_id = floorplan['id']
+            floorplan_name = floorplan['name']
+            print(f'Creating Ekahau file for {floorplan_name}...')
+            self.esx_writer.create_floorplan_specific_esx_file(esx_filepath, floorplan_name, floorplan_id)
+            print(f'File created...')
+            result[floorplan_name] = {'success':[floorplan_id], 'error':[]}
+        return result
+
 class TaskManager:
 
     task_datastructure = {
         'assign ap' : [NameAssoc, SiteMac],
         'name ap' : [NameAssoc, SiteMacName],
+        'rename esx ap' : [],
+        'create per floor esx files' : [],
     }
 
-    def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None):
+    def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None, esx_writer:EkahauWriter = None):
         username = config['login']['username']
         password = config['login']['password']
         login_params = {
@@ -248,6 +290,8 @@ class TaskManager:
         print('logging in...')
         self.handler = handler('usr_pw', login_params)
         self.writer = writer
+
+        self.esx_writer = esx_writer
 
         self.handler.save_org_id_by_name(config['org'])
         self.handler.populate_site_id_dict()
@@ -351,11 +395,16 @@ class TaskManager:
         self.execute_queue = []
         for task in self.tasks:
             if task == 'assign ap':
-                assign_task = AssignTask(self.data_structures['site_to_mac'], self.site_name_to_id, self.data_structures['name_association'], self.handler)
-                self.execute_queue.append(assign_task)
+                task_instance = AssignTask(self.data_structures['site_to_mac'], self.site_name_to_id, self.data_structures['name_association'], self.handler)
             elif task == 'name ap':
-                name_task = NameAPTask(self.data_structures['site_mac_name'], self.data_structures['name_association'], self.handler)
-                self.execute_queue.append(name_task)
+                task_instance = NameAPTask(self.data_structures['site_mac_name'], self.data_structures['name_association'], self.handler)
+            elif task == 'rename esx ap':
+                task_instance = RenameAPEsxTask(self.esx_writer)
+            elif task == 'create per floor esx files':
+                task_instance = CreatePerFloorEsxFilesTask(self.esx_writer)
+            else:
+                raise ValueError(f'Unknown task: {task}. Available tasks are:\nassign ap\nname ap\nrename esx ap\ncreate per floor esx files\n')
+            self.execute_queue.append(task_instance)
     
     def execute_tasks(self):
         self.results = []
