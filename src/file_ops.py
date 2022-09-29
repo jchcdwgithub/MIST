@@ -6,6 +6,7 @@ import pandas
 import yaml
 import re
 import os
+import copy
 
 class IOReader:
     def __init__(self, file:str):
@@ -199,6 +200,54 @@ class EkahauWriter:
             self.remove_surveys_that_reference_current_floorplan(esx_f, new_filename, floorplan_id)
         os.remove(new_filename)
 
+    def create_floorplan_specific_esx_data(self, data_structures:Tuple) -> List[Dict]:
+        shared_files, floorplan_spec_files, survey_files = data_structures
+        floorplans = {}
+        aps = {}
+        areas = {}
+        exclusionAreas = {}
+        
+        for item in floorplan_spec_files:
+            item_name = item['name']
+            if item_name == 'floorPlans.json':
+                floorplans = item
+            elif item_name == 'accessPoints.json':
+                aps = item
+            elif item_name == 'areas.json':
+                areas = item
+            elif item_name == 'exclusionAreas.json':
+                exclusionAreas = item
+
+        floorplan_name_id = {floorplan['name']:floorplan['id'] for floorplan in floorplans['data']['floorPlans']}
+
+        floorplans_spec_files = {}
+        for floorplan in floorplan_name_id:
+            floorplan_id = floorplan_name_id[floorplan]
+            floorplans_copy = copy.deepcopy(floorplans) 
+            new_floorplan_json = self.remove_all_floorplans_except_current_floorplan_(floorplans_copy, floorplan_id)        
+
+            aps_copy = copy.deepcopy(aps) 
+            new_ap_json = self.remove_location_info_from_aps_not_on_floorplan_(aps_copy, floorplan_id)
+
+            areas_copy = copy.deepcopy(areas) 
+            new_areas_json = self.remove_floorplan_from_areas_(areas_copy, floorplan_id)
+
+            exc_areas_copy = copy.deepcopy(exclusionAreas) 
+            new_exc_areas_json = self.remove_floorplan_from_excluded_areas_(exc_areas_copy, floorplan_id)
+
+            survey_files_copy = copy.deepcopy(survey_files) 
+            floorplan_only_surveys = self.remove_surveys_that_ref_current_floorplan(survey_files_copy, floorplan_id)
+            floorplans_spec_files[floorplan] = shared_files + [new_floorplan_json, new_ap_json, new_areas_json, new_exc_areas_json] + floorplan_only_surveys
+        
+        return floorplans_spec_files
+
+    def create_floorplan_specific_esx_file(self, esx_filepath:str, floorplan_name:str, esx_files:List[Dict]):
+        esx_filepath_wo_ext = esx_filepath[:len(esx_filepath)-4]
+        esx_with_floorplan_only_filename = f'{esx_filepath_wo_ext} {floorplan_name}.esx'
+        with ZipFile(esx_with_floorplan_only_filename, 'w') as esx_f:
+            for esx_file in esx_files:
+                esx_f.writestr(esx_file['name'], esx_file['data'])
+
     def remove_surveys_that_reference_current_floorplan(self, esx_file_handler:ZipFile, new_filename:str, floorplan_id:str):
         survey_regex = re.compile(r'survey-.*\.json')
         with ZipFile(new_filename[:len(new_filename)-4]+'_.esx', 'w') as new_file:
@@ -213,6 +262,15 @@ class EkahauWriter:
                     buffer = esx_file_handler.read(item.filename)
                     new_file.writestr(item, buffer)
 
+    def remove_surveys_that_ref_current_floorplan(self, survey_files:List[Dict], floorplan_id:str) -> List[Dict]:
+        survey_files_copy = []
+        for survey in survey_files:
+            survey_data = survey['data']['surveys']
+            for surv in survey_data:
+                if surv['floorPlanId'] == floorplan_id:
+                    survey_files_copy.append({'name':survey['name'], 'data':json.dumps(survey['data']).encode('utf-8')})
+        return survey_files_copy
+
     def remove_location_info_from_aps_not_on_floorplan(self, esx_file_handler:ZipFile, floorplan_id:str):
         with esx_file_handler.open('accessPoints.json') as ap_f:
             ap_json = json.loads(ap_f.read())
@@ -220,6 +278,14 @@ class EkahauWriter:
             for ap in ap_json_copy['accessPoints']:
                 if 'location' in ap and ap['location']['floorPlanId'] != floorplan_id:
                     ap.pop('location')
+        return ap_json_copy
+
+    def remove_location_info_from_aps_not_on_floorplan_(self, ap_json:Dict, floorplan_id:str) -> Dict:
+        ap_json_copy = ap_json.copy()
+        for ap in ap_json_copy['data']['accessPoints']:
+            if 'location' in ap and ap['location']['floorPlanId'] != floorplan_id:
+                ap.pop('location')
+        ap_json_copy['data'] = json.dumps(ap_json_copy['data']).encode('utf-8')
         return ap_json_copy
 
     def remove_floorplan_from_areas(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
@@ -231,6 +297,14 @@ class EkahauWriter:
                     new_areas_json['areas'].append(area)
         return new_areas_json
 
+    def remove_floorplan_from_areas_(self, areas_json:Dict, floorplan_id:str) -> Dict:
+        new_areas_json = {'areas':[]}
+        for area in areas_json['data']['areas']:
+            if area['floorPlanId'] == floorplan_id:
+                new_areas_json['areas'].append(area)
+        return {'name':areas_json['name'], 'data':json.dumps(new_areas_json).encode('utf-8')}
+
+
     def remove_floorplan_from_excluded_areas(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
         with esx_file_handler.open('exclusionAreas.json') as exc_areas_f:
             exc_areas_json = json.loads(exc_areas_f.read())
@@ -240,6 +314,13 @@ class EkahauWriter:
                     new_exc_areas_json['exclusionAreas'].append(exc_area)
         return new_exc_areas_json
 
+    def remove_floorplan_from_excluded_areas_(self, exc_areas_json, floorplan_id:str) -> Dict:
+        new_exc_areas_json = {'exclusionAreas':[]}
+        for exc_area in exc_areas_json['data']['exclusionAreas']:
+            if exc_area['floorPlanId'] == floorplan_id:
+                new_exc_areas_json['exclusionAreas'].append(exc_area)
+        return {'name':exc_areas_json['name'], 'data': json.dumps(new_exc_areas_json).encode('utf-8') }
+
     def remove_all_floorplans_except_current_floorplan(self, esx_file_handler:ZipFile, floorplan_id:str) -> Dict:
         with esx_file_handler.open('floorPlans.json') as floorplan_f:
             floorplan_json = json.loads(floorplan_f.read())
@@ -248,3 +329,38 @@ class EkahauWriter:
                 if floorplan['id'] == floorplan_id:
                     filtered_floorplan['floorPlans'].append(floorplan)
         return filtered_floorplan 
+
+    def remove_all_floorplans_except_current_floorplan_(self, floorplan_json:Dict, floorplan_id:str) -> Dict:
+        filtered_floorplan = {'floorPlans':[]} 
+        for floorplan in floorplan_json['data']['floorPlans']:
+            if floorplan['id'] == floorplan_id:
+                filtered_floorplan['floorPlans'].append(floorplan)
+        return {'name':floorplan_json['name'], 'data':json.dumps(filtered_floorplan).encode('utf-8') }
+
+    def extract_info_from_esx_file(self, esx_filepath:str='') -> Tuple[List, List, List]:
+        """
+        Reads from an esx file and returns a 3-tuple of shared_files, floorplan_specific_files, survey_files.
+        """
+        shared_files = []
+        floorplan_specific_files = []
+        survey_files = []
+        floorplan_specific_filenames = {'accessPoints.json', 'areas.json', 'exclusionAreas.json', 'floorPlans.json','interferers.json'}
+        survey_regex = re.compile(r'survey-.*\.json')
+        if esx_filepath == '':
+            esx_filepath = self.config['sites']['esx_file']
+        with ZipFile(esx_filepath, 'r') as zf:
+            for item in zf.infolist():
+                if item.filename in floorplan_specific_filenames:
+                    with zf.open(item.filename) as item_f:
+                        item_data = json.loads(item_f.read())
+                        item_dict = {'name':item.filename, 'data': item_data}
+                        floorplan_specific_files.append(item_dict)
+                elif survey_regex.match(item.filename):
+                    with zf.open(item.filename) as item_f:
+                        item_data = json.loads(item_f.read())
+                        item_dict = {'name':item.filename, 'data':item_data}
+                        survey_files.append(item_dict)
+                else:
+                    buffer = zf.read(item.filename)
+                    shared_files.append({'name':item.filename, 'data':buffer})
+        return (shared_files, floorplan_specific_files, survey_files)

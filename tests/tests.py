@@ -1,5 +1,6 @@
 import sys
 import os
+from webbrowser import get
 src_path = os.getenv('MistAPIHandler')
 sys.path.append(src_path)
 import inventory_devices
@@ -437,12 +438,23 @@ def get_test_floorplan_data():
 
 @pytest.fixture
 def create_temp_esx_zip(get_test_ap_data, get_test_floorplan_data):
-    temp_zip = os.path.join(os.getcwd(), 'dev', 'test.zip')
+    temp_zip = os.path.join(os.getcwd(), 'dev', 'test.esx')
     with ZipFile(temp_zip, 'w') as zf:
             zf.writestr('accessPoints.json', json.dumps(get_test_ap_data))
             zf.writestr('floorPlans.json', json.dumps(get_test_floorplan_data))
+            zf.writestr('areas.json', json.dumps({'areas':[]}))
+            zf.writestr('exclusionAreas.json', json.dumps({'exclusionAreas':[]}))
+            zf.writestr('survey-1.json', json.dumps({'surveys':[{'floorPlanId':"85222db6-8dcb-4e79-998f-e2416ab44153"}]}))
+            zf.writestr('survey-2.json', json.dumps({'surveys':[{'floorPlanId':"9ec73444-e1e0-41b0-a249-8ff98570977e"}]}))
+            zf.writestr('project.json', json.dumps({'project':[]}))
     yield temp_zip
     os.remove(temp_zip)
+
+@pytest.fixture
+def get_extracted_lists_from_temp_esx_zip(create_temp_esx_zip):
+    esx_writer = file_ops.EkahauWriter(get_test_config_data())
+    results = esx_writer.extract_info_from_esx_file(create_temp_esx_zip)
+    return (results, esx_writer)
 
 def test_remove_floor_from_site_name_removes_floor():
     test_data = 'SCP MAB Flr-1'
@@ -825,8 +837,112 @@ def test_remove_locations_from_aps_removes_only_designated_floorplan_id(create_t
         generated = esx_writer.remove_location_info_from_aps_not_on_floorplan(zf,floorplan_id)
     assert expected == generated
 
+def test_remove_locations_from_aps_removes_only_designated_floorplan_id_(get_extracted_lists_from_temp_esx_zip):
+    floorplan_id = "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0"
+    expected = { 
+        'name':'accessPoints.json',
+        'data': json.dumps({
+        "accessPoints": [
+    {
+      "name": "Measured AP-33:ab",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "tags": [],
+      "id": "b185b285-22cf-4dc2-8033-185950809ce7",
+      "status": "CREATED"
+    },
+    {
+      "name": "vbg2600-n1e-12",
+      "mine": False,
+      "userDefinedPosition": False,
+      "noteIds": [],
+      "vendor": "Cisco",
+      "model": "",
+      "tags": [],
+      "id": "6a99621e-db58-401f-ab4c-29e8ae3d835b",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 765.3018727910558,
+          "y": 288.53909480473203
+        }
+      },
+      "name": "AP21",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "bc474aaf-9cd5-4651-9e6c-cff0603ac006"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "8f3a97a6-28e9-4752-92ad-6f00352817a6",
+      "status": "CREATED"
+    },
+    {
+      "name": "AP072",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "665e40b4-0691-4555-acaf-77d270286ee3"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "f1d7b2b5-9461-49a1-9558-9b0241380dc4",
+      "status": "CREATED"
+    },
+    {
+      "location": {
+        "floorPlanId": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+        "coord": {
+          "x": 685.7095447426987,
+          "y": 456.6705156205836
+        }
+      },
+      "name": "AP36",
+      "mine": True,
+      "userDefinedPosition": True,
+      "noteIds": [
+        "1f64acf0-c90f-4fd7-a465-829f85319e15"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "fb08208f-9ebe-48ac-ae37-33fc52f37aa8",
+      "status": "CREATED"
+    },
+    {
+      "name": "AP058",
+      "mine": True,
+      "userDefinedPosition": False,
+      "noteIds": [
+        "4ad6864e-7732-4938-94a8-55e4dc41e7e2"
+      ],
+      "vendor": "Mist",
+      "model": "",
+      "tags": [],
+      "id": "189990f4-c1fa-4fbf-8580-c56f3c6ebeac",
+      "status": "CREATED"
+    },
+  ]
+    }).encode('utf-8')
+    }
+    items, esx_writer = get_extracted_lists_from_temp_esx_zip
+    ap_json = {}
+    for item in items[1]:
+        if item['name'] == 'accessPoints.json':
+            ap_json = item
+            break
+    generated = esx_writer.remove_location_info_from_aps_not_on_floorplan_(ap_json,floorplan_id)
+    assert expected == generated
+
 def test_remove_all_floorplans_except_current_floorplan_keeps_only_current_floorplan(create_temp_esx_zip):
-    esx_writer = file_ops.EkahauWriter(get_test_config_data)
+    esx_writer = file_ops.EkahauWriter(get_test_config_data())
     floorplan_id = "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0"
     expected = {
         "floorPlans": [
@@ -851,4 +967,52 @@ def test_remove_all_floorplans_except_current_floorplan_keeps_only_current_floor
     }
     with ZipFile(create_temp_esx_zip) as zf:
         generated = esx_writer.remove_all_floorplans_except_current_floorplan(zf, floorplan_id)
+    assert expected == generated
+
+def test_remove_all_floorplans_except_current_floorplan_keeps_only_current_floorplan_(get_extracted_lists_from_temp_esx_zip):
+    floorplan_id = "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0"
+    expected = {
+        "name" : 'floorPlans.json',
+        "data" : json.dumps({
+        "floorPlans": [
+    {
+      "name": "VBG - Floor 2",
+      "width": 1132.0,
+      "height": 945.0,
+      "metersPerUnit": 0.25379893534497106,
+      "imageId": "52f16650-a60a-431e-ae0f-448b1d2745cb",
+      "gpsReferencePoints": [],
+      "floorPlanType": "FSPL",
+      "cropMinX": 140.41353383458642,
+      "cropMinY": 42.29323308270676,
+      "cropMaxX": 1110.0075187969924,
+      "cropMaxY": 741.9924812030076,
+      "rotateUpDirection": "UP",
+      "tags": [],
+      "id": "2d3b2d17-25d3-4ebb-bd8c-5fc7b9b75bf0",
+      "status": "CREATED"
+    },
+        ]
+    }).encode('utf-8')
+    }
+    items, esx_writer = get_extracted_lists_from_temp_esx_zip
+    floorplan_json = {}
+    for item in items[1]:
+        if item['name'] == 'floorPlans.json':
+            floorplan_json = item
+            break
+    generated = esx_writer.remove_all_floorplans_except_current_floorplan_(floorplan_json, floorplan_id)
+    assert expected == generated
+
+def test_extract_esx_info_creates_shared_info_dict_and_floorplan_info_dict_and_survey_dict(create_temp_esx_zip, get_test_ap_data, get_test_floorplan_data):
+    esx_filepath = create_temp_esx_zip
+    ap_data = get_test_ap_data
+    ap_dict = {'name':'accessPoints.json', 'data':ap_data }
+    floorplan_data = get_test_floorplan_data
+    floorplan_dict = {'name':'floorPlans.json', 'data':floorplan_data }
+    expected = ([{'name':'project.json','data':b'{"project": []}'}], [ap_dict, floorplan_dict, {"name":"areas.json", 'data':{"areas":[]}}, {'name':'exclusionAreas.json', 'data':{"exclusionAreas":[]}}],[{'name':'survey-1.json','data':{"surveys":[{"floorPlanId":"85222db6-8dcb-4e79-998f-e2416ab44153"}]}}, {'name':'survey-2.json', 'data':{"surveys":[{"floorPlanId":"9ec73444-e1e0-41b0-a249-8ff98570977e"}]}}])
+    config = get_test_config_data()
+    config['sites']['esx_file'] = esx_filepath
+    esx_writer = file_ops.EkahauWriter(config)
+    generated = esx_writer.extract_info_from_esx_file(esx_filepath)
     assert expected == generated

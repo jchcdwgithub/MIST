@@ -257,15 +257,14 @@ class CreatePerFloorEsxFilesTask:
         esx_copy_filepath = esx_filepath[:len(esx_filepath)-4] + ' - Copy.esx'
         if os.path.exists(esx_copy_filepath):
             esx_filepath = esx_copy_filepath
-        floorplans_json = self.esx_writer.get_floorplan_json_from_file(esx_filepath)
         result = {'task' : 'create per floor esx files'}
-        for floorplan in floorplans_json['floorPlans']:
-            floorplan_id = floorplan['id']
-            floorplan_name = floorplan['name']
-            print(f'Creating Ekahau file for {floorplan_name}...')
-            self.esx_writer.create_floorplan_specific_esx_file(esx_filepath, floorplan_name, floorplan_id)
-            print(f'File created...')
-            result[floorplan_name] = {'success':[floorplan_id], 'error':[]}
+        ds = self.esx_writer.extract_info_from_esx_file(esx_filepath)
+        fs_ds = self.esx_writer.create_floorplan_specific_esx_data(ds)
+        for floor in fs_ds:
+            print(f'creating file {floor}...')
+            self.esx_writer.create_floorplan_specific_esx_file(esx_filepath, floor, fs_ds[floor])
+            result[floor] = {'success':[floor], 'error':[]}
+            print('file created.')
         return result
 
 class TaskManager:
