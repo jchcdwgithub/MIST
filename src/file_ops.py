@@ -1,3 +1,4 @@
+from math import floor
 from typing import Dict, List, Tuple
 from zipfile import ZipFile
 import json
@@ -132,26 +133,18 @@ class EkahauWriter:
 
     def replace_ap_names_in_esx_file(self, esx_filepath:str):
 
-        new_esx_filepath = self.copy_esx_file(esx_filepath)
-        esx_old_filepath, esx_new_filepath = self.rename_esx_file(new_esx_filepath)
         esx_to_final_naming = self.create_ap_naming_dict()
+        site_name = esx_filepath[:len(esx_filepath)-4].split('\\')[-1]
+        if site_name in esx_to_final_naming:
+            esx_to_final_naming_ds = esx_to_final_naming[site_name]
 
-        with ZipFile(esx_new_filepath, 'a') as zf:
+        with ZipFile(esx_filepath, 'a') as zf:
             with zf.open('accessPoints.json') as ap_f:
                 esx_aps = json.loads(ap_f.read()) 
-                ap_name_location = {}
                 for ap in esx_aps['accessPoints']:
-                    if ap['name'] in esx_to_final_naming:
-                        ap['name'] = esx_to_final_naming[ap['name']]
-                        ap_name_location[ap['name']] = {
-                            'location': {
-                                'x': ap['location']['coord']['x'],
-                                'y': ap['location']['coord']['y']
-                            }
-                        }
+                    if ap['name'] in esx_to_final_naming_ds:
+                        ap['name'] = esx_to_final_naming_ds[ap['name']]
             zf.writestr('accessPoints.json', json.dumps(esx_aps)) 
-
-        os.rename(esx_new_filepath, esx_old_filepath)
 
     def copy_esx_file(self, esx_filepath:str, new_filename:str='- Copy') -> str:
         
@@ -168,14 +161,51 @@ class EkahauWriter:
         os.rename(esx_old_filepath, esx_new_filepath)
         return (esx_old_filepath, esx_new_filepath)
 
-    def create_ap_naming_dict(self) -> Dict[str, str]:
-
+    def create_ap_naming_dict(self, floor_dependent_naming:bool=False) -> Dict[str, str]:
         excel_filepath = self.config['sites']['ap_excel_file']
         sheet_name = self.config['sites']['sheet_name']
+        lowercase_name = self.config['sites']['lowercase_ap_names']
+        excel_columns_to_read = [
+            self.config['sites']['header_column_names']['esx_ap_name'],
+            self.config['sites']['header_column_names']['ap_name']
+            ]
+        site_column = self.config['sites']['header_column_names']['site']
         df = pandas.read_excel(excel_filepath, sheet_name=sheet_name)
         df_without_empty_names = df.dropna(subset=['New WAP Name'])
-        values = df_without_empty_names.loc[:,['WAP location #\non Drawing', 'New WAP Name']]
-        return {esx_name:final_name.lower() for esx_name, final_name in values.values.tolist()}
+        if floor_dependent_naming:
+            excel_columns_to_read.append(site_column)
+            values = df_without_empty_names.loc[:,excel_columns_to_read].groupby(site_column)
+        else:
+            values = df_without_empty_names.loc[:,excel_columns_to_read]
+        ap_naming_dict = {}
+        for name, group in values:
+            ap_naming_dict[name] = {}
+            for item in group.values:
+                if floor_dependent_naming:
+                    esx_name, final_name, _ = item
+                else:
+                    esx_name, final_name = item
+                ap_naming_dict[name][esx_name] = final_name.lower() if lowercase_name else final_name
+        return ap_naming_dict
+
+    def rename_aps_floor_dependent(self, esx_filepath:str):
+        ap_naming_dict = self.create_ap_naming_dict(floor_dependent_naming=True)
+        new_esx_filepath = self.copy_esx_file(esx_filepath)
+        with ZipFile(new_esx_filepath, 'a') as zf:
+            with zf.open('floorPlans.json', 'r') as fp_f:
+                fp_json = json.loads(fp_f.read())
+                floorplan_name = {fp['id']:fp['name'] for fp in fp_json['floorPlans']}
+            with zf.open('accessPoints.json', 'r') as ap_f:
+                ap_json = json.loads(ap_f.read())
+                for ap in ap_json['accessPoints']:
+                    if 'location' in ap:
+                        floor_name = floorplan_name[ap['location']['floorPlanId']]
+                        try:
+                            ap['name'] = ap_naming_dict[floor_name][ap['name']]
+                        except KeyError:
+                            print(f'found AP in esx file that is not in the excel sheet: {ap["name"]}')
+                zf.writestr('accessPoints.json', json.dumps(ap_json))
+        return ap_json
 
     def get_floorplan_json_from_file(self, esx_filepath:str) -> Dict[str, str]:
         with ZipFile(esx_filepath) as esx_f:

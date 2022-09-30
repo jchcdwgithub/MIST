@@ -254,15 +254,12 @@ class CreatePerFloorEsxFilesTask:
 
     def perform_task(self):
         esx_filepath = self.esx_writer.config['sites']['esx_file']
-        esx_copy_filepath = esx_filepath[:len(esx_filepath)-4] + ' - Copy.esx'
-        if os.path.exists(esx_copy_filepath):
-            esx_filepath = esx_copy_filepath
         result = {'task' : 'create per floor esx files'}
-        ds = self.esx_writer.extract_info_from_esx_file(esx_filepath)
-        fs_ds = self.esx_writer.create_floorplan_specific_esx_data(ds)
-        for floor in fs_ds:
+        esx_data = self.esx_writer.extract_info_from_esx_file(esx_filepath)
+        floorplan_ds = self.esx_writer.create_floorplan_specific_esx_data(esx_data)
+        for floor in floorplan_ds:
             print(f'creating file {floor}...')
-            self.esx_writer.create_floorplan_specific_esx_file(esx_filepath, floor, fs_ds[floor])
+            self.esx_writer.create_floorplan_specific_esx_file(esx_filepath, floor, floorplan_ds[floor])
             result[floor] = {'success':[floor], 'error':[]}
             print('file created.')
         return result

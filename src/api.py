@@ -35,6 +35,7 @@ class MistAPIHandler:
         "get_mxedge_models" : "const/mxedge_models",
         "get_mxedge_clusters" : "orgs/{}/mxclusters",
         "wlan" : "orgs/{}/wlans",
+        "import_map" : "sites/{}/maps/import",
     }
     sites  = {}
     org_id = ''
@@ -300,10 +301,18 @@ class MistAPIHandler:
         
         return self._action_api_endpoint('wlans', [org_id])
 
-    def _action_api_endpoint(self, api_endpoint:str, api_params:list[str], call_body:Dict[str,str]={}, action:str='get') -> Dict[str,str]:
+    def import_map(self, site_id:str, map, headers:Dict) -> Dict[str, str]:
+
+        return self._action_api_endpoint('import_map', [site_id], call_body=map, action='post', multi=True, custom_headers=headers)
+
+
+    def _action_api_endpoint(self, api_endpoint:str, api_params:list[str], call_body:Dict[str,str]={}, action:str='get', multi:bool=False, custom_headers:Dict={}) -> Dict[str,str]:
         
         full_api_path = self._make_full_api_uri(api_endpoint, api_params)
-        return self._make_api_call(full_api_path, call_body, action)
+        if multi:
+            return self._make_multi_api_call(full_api_path, call_body, custom_headers)
+        else:
+            return self._make_api_call(full_api_path, call_body, action)
 
     def _make_full_api_uri(self, api_endpoint:str, api_params:list[str]) -> str:
 
@@ -313,6 +322,14 @@ class MistAPIHandler:
             return full_api_path
         else:
             raise ValueError(f"The API endpoint is not currently supported. Add it to the api_endpoints list and try again.")
+    
+    def _make_multi_api_call(self, full_api_path:str, call_body, headers:Dict) -> Dict[str,str]:
+        headers['X-CSRFTOKEN'] = self.headers['X-CSRFTOKEN']
+        response = requests.request('post', full_api_path, data=call_body, headers=headers,cookies=self.cookies)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Request failed: {response.status_code} {response.reason}")
 
     def _make_api_call(self, full_api_path:str, call_body:Dict[str,str], action:str) -> Dict[str,str]:
 
