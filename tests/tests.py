@@ -84,9 +84,10 @@ def get_test_config_data() -> Dict:
             'ap_excel_file' : '',
             'sheet_name' : 'test',
             'header_column_names': {
-                'site' : 'Site\nBld\nFloor',
+                'site_name' : 'Site\nBld\nFloor',
                 'ap_name' : 'New WAP Name',
-                'ap_mac' : 'New WAP \nMAC Address'
+                'ap_mac' : 'New WAP \nMAC Address',
+                'esx_ap_name' : 'WAP location #\non Drawing'
             },
             'dropna_header' : 'New WAP \nMAC Address',
             'groupby' : 'Site\nBld\nFloor',
@@ -147,6 +148,10 @@ def name_association() -> Dict[str, str]:
     }
 
 @pytest.fixture
+def esx_writer() -> file_ops.EkahauWriter:
+  return file_ops.EkahauWriter(get_test_config_data())
+
+@pytest.fixture
 def create_temp_site_excel() -> str:
     test_macs = ['aabbccddeef1', 'aabbccddeef2']
     df = pandas.DataFrame(data=test_macs, columns=['MAC'])
@@ -162,8 +167,8 @@ def create_temp_site_excel() -> str:
 
 @pytest.fixture
 def create_temp_excel_data() -> str:
-    test_data = [[f'site1 Flr-0{num}', f'aabbccddeef{num}', f'ap-{num}'] for num in range(5)] 
-    df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name'])
+    test_data = [[f'site1 Flr-0{num}', f'aabbccddeef{num}', f'ap-{num}', f'flr{num}-ap-{num}'] for num in range(5)] 
+    df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'New WAP \nMAC Address','New WAP Name', 'WAP location #\non Drawing'])
     full_path = os.path.join(os.getcwd(), 'data', 'test_data.xlsx')
     df.to_excel(full_path, index=False, sheet_name='test')
     yield full_path
@@ -181,6 +186,28 @@ def create_temp_excel_data_uppercase_names() -> str:
 @pytest.fixture
 def create_temp_excel_with_duplicate_names_between_floors() -> str:
   test_data = [[f'site1 Flr-{num}', f'ap-1', f'flr{num}-ap-{num}'] for num in range(5)]
+  df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'WAP location #\non Drawing', 'New WAP Name'])
+  full_path = os.path.join(os.getcwd(), 'dev', 'test_data.xlsx')
+  df.to_excel(full_path, index=False, sheet_name='test')
+  yield full_path
+  os.remove(full_path)
+
+@pytest.fixture
+def create_temp_excel_with_duplicate_names_between_floors_and_ap_names_not_in_esx_file() -> str:
+  in_esx_data = [[f'site1 Flr-{num}', f'ap-1', f'flr{num}-ap-{num}'] for num in range(5)]
+  not_in_esx_data = [[f'site{num} Flr-{num}', f'Replace{num}', f'flr{num}-ap-{num+10}' ] for num in range(5)] 
+  test_data = in_esx_data + not_in_esx_data
+  df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'WAP location #\non Drawing', 'New WAP Name'])
+  full_path = os.path.join(os.getcwd(), 'dev', 'test_data.xlsx')
+  df.to_excel(full_path, index=False, sheet_name='test')
+  yield full_path
+  os.remove(full_path)
+
+@pytest.fixture
+def create_temp_excel_with_ap_names_in_esx_file_and_not_in_esx_file() -> str:
+  in_esx_data = [[f'site{num} Flr-{num}', f'ap-{num}', f'flr{num}-ap-{num}'] for num in range(5)] 
+  not_in_esx_data = [[f'site{num} Flr-{num}', f'Replace{num}', f'flr{num}-ap-{num+10}' ] for num in range(5)] 
+  test_data = in_esx_data + not_in_esx_data
   df = pandas.DataFrame(data=test_data, columns=['Site\nBld\nFloor', 'WAP location #\non Drawing', 'New WAP Name'])
   full_path = os.path.join(os.getcwd(), 'dev', 'test_data.xlsx')
   df.to_excel(full_path, index=False, sheet_name='test')
@@ -477,6 +504,17 @@ def get_test_ap_json():
   }
 
 @pytest.fixture
+def get_test_ap_json_unique_ap_names():
+  return {
+    'accessPoints' : [
+      {
+        'name': f'ap-{num}',
+        'location' : {'floorPlanId': f'id{num}'}
+      } for num in range(5)
+    ]
+  }
+
+@pytest.fixture
 def get_test_floorplans_json():
   return {
     'floorPlans' : [
@@ -492,6 +530,15 @@ def create_temp_esx_file(get_test_ap_json, get_test_floorplans_json):
   temp_esx = os.path.join(os.getcwd(), 'dev', 'test.esx')
   with ZipFile(temp_esx, 'w') as zf:
     zf.writestr('accessPoints.json', json.dumps(get_test_ap_json))
+    zf.writestr('floorPlans.json', json.dumps(get_test_floorplans_json))
+  yield temp_esx
+  os.remove(temp_esx)
+
+@pytest.fixture
+def create_temp_esx_file_with_unique_ap_names(get_test_ap_json_unique_ap_names, get_test_floorplans_json):
+  temp_esx = os.path.join(os.getcwd(), 'dev', 'test.esx')
+  with ZipFile(temp_esx, 'w') as zf:
+    zf.writestr('accessPoints.json', json.dumps(get_test_ap_json_unique_ap_names))
     zf.writestr('floorPlans.json', json.dumps(get_test_floorplans_json))
   yield temp_esx
   os.remove(temp_esx)
@@ -636,7 +683,7 @@ def test_validate_data_structure_removes_macs_already_assigned_macs_from_site_ma
             'ap_excel_file' : create_temp_excel_data,
             'sheet_name' : 'test',
             'header_column_names': {
-                'site' : 'Site\nBld\nFloor',
+                'site_name' : 'Site\nBld\nFloor',
                 'ap_name' : 'New WAP Name',
                 'ap_mac' : 'New WAP \nMAC Address'
             },
@@ -1058,15 +1105,52 @@ def test_extract_esx_info_creates_shared_info_dict_and_floorplan_info_dict_and_s
     assert expected == generated
 
 def test_rename_aps_floor_dependent_renames_aps_per_floor_despite_redudant_map_names(create_temp_excel_with_duplicate_names_between_floors, create_temp_esx_file):
-  esx_writer = file_ops.EkahauWriter({'sites':{'ap_excel_file':create_temp_excel_with_duplicate_names_between_floors, 'sheet_name':'test','lowercase_ap_names':True, 'header_column_names': {'site':'Site\nBld\nFloor', 'esx_ap_name':'WAP location #\non Drawing', 'ap_name':'New WAP Name'}, 'groupby':'Site\nBld\nFloor'}})
+  esx_writer = file_ops.EkahauWriter({'sites':{'ap_excel_file':create_temp_excel_with_duplicate_names_between_floors, 'sheet_name':'test','lowercase_ap_names':True, 'header_column_names': {'site_name':'Site\nBld\nFloor', 'esx_ap_name':'WAP location #\non Drawing', 'ap_name':'New WAP Name'}, 'groupby':'Site\nBld\nFloor'}})
   generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
   expected = {
-    'accessPoints' : [
-      {
-        'name' : f'flr{num}-ap-{num}',
-        'location': {'floorPlanId' : f'id{num}'}
-      } for num in range(5)
-    ]
+    'task' : 'rename esx ap',
+    'test' : { 'success' : [f'flr{num}-ap-{num}' for num in range(5)],
+    'error': [] 
+    }
   }
   assert expected == generated
   os.remove(create_temp_esx_file[:len(create_temp_esx_file)-4] + ' - Copy.esx')
+
+def test_ap_name_is_repeated_throughout_esx_map_returns_true_for_maps_with_repeated_ap_names(create_temp_excel_with_duplicate_names_between_floors):
+  esx_writer = file_ops.EkahauWriter({'sites':{'ap_excel_file':create_temp_excel_with_duplicate_names_between_floors, 'sheet_name':'test','lowercase_ap_names':True, 'header_column_names': {'site':'Site\nBld\nFloor', 'esx_ap_name':'WAP location #\non Drawing', 'ap_name':'New WAP Name'}, 'groupby':'Site\nBld\nFloor'}})
+  generated = esx_writer.ap_names_are_unique_throughout_excel_file()
+  assert False == generated
+
+def test_replace_aps_in_esx_file_returns_a_list_of_successful_and_failed_to_rename_aps(create_temp_excel_with_ap_names_in_esx_file_and_not_in_esx_file, create_temp_esx_file_with_unique_ap_names, esx_writer):
+  esx_writer = esx_writer
+  esx_writer.config['sites']['ap_excel_file'] = create_temp_excel_with_ap_names_in_esx_file_and_not_in_esx_file
+  esx_writer.config['sites']['esx_file'] = create_temp_esx_file_with_unique_ap_names
+  expected = {
+    'task' : 'rename esx ap',
+    'test': {
+    'success' : [
+      f'flr{num}-ap-{num}' for num in range(5)
+    ],
+    'error' : [
+      f'flr{num}-ap-{num+10}' for num in range(5)
+    ]}
+  }
+  generated = esx_writer.replace_ap_names_in_esx_file(create_temp_esx_file_with_unique_ap_names)
+  assert expected == generated
+
+def test_rename_ap_floor_dependent_returns_a_list_of_successful_and_failed_to_rename_aps(create_temp_esx_file, create_temp_excel_with_duplicate_names_between_floors_and_ap_names_not_in_esx_file, esx_writer):
+  esx_writer = esx_writer
+  esx_writer.config['sites']['ap_excel_file'] = create_temp_excel_with_duplicate_names_between_floors_and_ap_names_not_in_esx_file
+  esx_writer.config['sites']['esx_file'] = create_temp_esx_file
+  expected = {
+    'task' : 'rename esx ap',
+    'test': {
+    'success' : [
+      f'flr{num}-ap-{num}' for num in range(5)
+    ],
+    'error' : [
+      f'flr{num}-ap-{num+10}' for num in range(5)
+    ]}
+  }
+  generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
+  assert expected == generated

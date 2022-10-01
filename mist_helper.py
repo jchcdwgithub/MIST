@@ -19,9 +19,9 @@ def main():
     print('executing tasks...')
     task_manager.execute_tasks()
 
-    if 'assign ap' in task_manager.tasks or 'name ap' in task_manager.tasks:
-        print('saving executed tasks to file...')
-        task_manager.save_success_configs_to_file()
+    print('saving executed tasks to file...')
+    task_manager.save_success_configs_to_file()
+    
     print('finished.')
 
 if __name__ == '__main__':

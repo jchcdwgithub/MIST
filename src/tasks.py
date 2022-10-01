@@ -55,7 +55,8 @@ class SiteMacName:
 
     def get_data_structure(self) -> Dict:
         headers = []
-        for item in self.config_sites['header_column_names']:
+        header_items = ['site_name', 'ap_name', 'ap_mac']
+        for item in header_items:
             headers.append(self.config_sites['header_column_names'][item].replace('\\n', '\n'))
         values = self.excel_reader.extract_table_from_file(headers, dropset=[self.config_sites['dropna_header'].replace('\\n', '\n')], groupby=self.config_sites['groupby'].replace('\\n', '\n'), worksheet=self.config_sites['sheet_name'])
         self.site_mac_name = {} 
@@ -106,7 +107,8 @@ class SiteMac:
 
     def get_data_structure(self) -> Dict:
         headers = []
-        for item in self.config_sites['header_column_names']:
+        header_items = ['site_name', 'ap_name', 'ap_mac']
+        for item in header_items:
             headers.append(self.config_sites['header_column_names'][item].replace('\\n', '\n'))
         values = self.reader.extract_table_from_file(headers, dropset=[self.config_sites['dropna_header'].replace('\\n', '\n')], groupby=self.config_sites['groupby'].replace('\\n', '\n'), worksheet=self.config_sites['sheet_name'])
         self.site_to_mac= {} 
@@ -242,8 +244,10 @@ class RenameAPEsxTask:
 
     def perform_task(self):
         esx_filepath = self.esx_writer.config['sites']['esx_file']
-        self.esx_writer.replace_ap_names_in_esx_file(esx_filepath)
-        result = {'task':'rename esx ap', esx_filepath : {'success':[esx_filepath], 'error':[]}}
+        if self.esx_writer.ap_names_are_unique_throughout_excel_file():
+            result = self.esx_writer.replace_ap_names_in_esx_file(esx_filepath)
+        else:
+            result = self.esx_writer.rename_aps_floor_dependent(esx_filepath)
         return result
 
 class CreatePerFloorEsxFilesTask:
@@ -269,8 +273,8 @@ class TaskManager:
     task_datastructure = {
         'assign ap' : [NameAssoc, SiteMac],
         'name ap' : [NameAssoc, SiteMacName],
-        'rename esx ap' : [],
-        'create per floor esx files' : [],
+        'rename esx ap' : [NameAssoc],
+        'create per floor esx files' : [NameAssoc],
     }
 
     def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None, esx_writer:EkahauWriter = None):
@@ -296,7 +300,7 @@ class TaskManager:
         print('reading information from excel file...')
         self._create_data_structures()
 
-        if self.config['sites']['lowercase_ap_names'] == True:
+        if self.config['sites']['lowercase_ap_names'] == True and 'site_mac_name' in self.data_structures:
             print('lowercasing ap names...')
             self.lowercase_names_in_site_mac_name_ds()
 

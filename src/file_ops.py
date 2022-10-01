@@ -86,7 +86,7 @@ class ExcelWriter:
     task_headers = {
         'assign ap' : ['MAC'],
         'name ap' : ['AP Name', 'MAC'],
-        'rename esx ap': ['Ekahau File'],
+        'rename esx ap': ['renamed aps'],
         'create per floor esx files' : ['Files'],
     }
 
@@ -101,11 +101,15 @@ class ExcelWriter:
             for key in result:
                 if key != 'task':
                     site_name = key
-                    out_filename = f'{self.sn_to_id[self.name_assoc[site_name]]}.xlsx'
+                    out_filename = ''
+                    if sheet_name in {'assign ap', 'name ap'}:
+                        out_filename = f'{self.sn_to_id[self.name_assoc[site_name]]}.xlsx'
+                    elif sheet_name in {'rename esx ap'}:
+                        out_filename = f'{site_name}.xlsx' 
                     full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
                     success_data = result[site_name]['success']
                     self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)
-
+    
     def write_success_data_to_worksheet(self, sheet_name:str, success_data:List, out_filename:str):
         dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])
         if os.path.exists(out_filename):
@@ -137,6 +141,9 @@ class EkahauWriter:
         site_name = esx_filepath[:len(esx_filepath)-4].split('\\')[-1]
         if site_name in esx_to_final_naming:
             esx_to_final_naming_ds = esx_to_final_naming[site_name]
+        else:
+            esx_to_final_naming_ds = esx_to_final_naming
+        results = {site_name: {'success':[], 'error':[]}, 'task': 'rename esx ap'}
 
         with ZipFile(esx_filepath, 'a') as zf:
             with zf.open('accessPoints.json') as ap_f:
@@ -144,7 +151,16 @@ class EkahauWriter:
                 for ap in esx_aps['accessPoints']:
                     if ap['name'] in esx_to_final_naming_ds:
                         ap['name'] = esx_to_final_naming_ds[ap['name']]
+                        results[site_name]['success'].append(ap['name'])
             zf.writestr('accessPoints.json', json.dumps(esx_aps)) 
+        
+        successfully_renamed_aps = results[site_name]['success']
+        for ap in esx_to_final_naming_ds:
+            new_name = esx_to_final_naming_ds[ap]
+            if not new_name in successfully_renamed_aps:
+                results[site_name]['error'].append(esx_to_final_naming_ds[ap])
+        
+        return results
 
     def copy_esx_file(self, esx_filepath:str, new_filename:str='- Copy') -> str:
         
@@ -161,36 +177,48 @@ class EkahauWriter:
         os.rename(esx_old_filepath, esx_new_filepath)
         return (esx_old_filepath, esx_new_filepath)
 
+    def ap_names_are_unique_throughout_excel_file(self) -> bool:
+        excel_file = self.config['sites']['ap_excel_file']
+        sheet_name = self.config['sites']['sheet_name']
+        esx_ap_column = self.config['sites']['header_column_names']['esx_ap_name'].replace('\\n', '\n')
+        df = pandas.read_excel(excel_file, sheet_name=sheet_name).dropna(subset=[esx_ap_column])
+        aps = df[esx_ap_column].values.tolist()
+        for ap in aps:
+            if aps.count(ap) > 1:
+                return False
+        return True
+
     def create_ap_naming_dict(self, floor_dependent_naming:bool=False) -> Dict[str, str]:
         excel_filepath = self.config['sites']['ap_excel_file']
         sheet_name = self.config['sites']['sheet_name']
         lowercase_name = self.config['sites']['lowercase_ap_names']
         excel_columns_to_read = [
-            self.config['sites']['header_column_names']['esx_ap_name'],
+            self.config['sites']['header_column_names']['esx_ap_name'].replace('\\n','\n'),
             self.config['sites']['header_column_names']['ap_name']
             ]
-        site_column = self.config['sites']['header_column_names']['site']
+        site_column = self.config['sites']['header_column_names']['site_name'].replace('\\n','\n')
         df = pandas.read_excel(excel_filepath, sheet_name=sheet_name)
         df_without_empty_names = df.dropna(subset=['New WAP Name'])
+        ap_naming_dict = {}
         if floor_dependent_naming:
             excel_columns_to_read.append(site_column)
             values = df_without_empty_names.loc[:,excel_columns_to_read].groupby(site_column)
-        else:
-            values = df_without_empty_names.loc[:,excel_columns_to_read]
-        ap_naming_dict = {}
-        for name, group in values:
-            ap_naming_dict[name] = {}
-            for item in group.values:
-                if floor_dependent_naming:
+            for name, group in values:
+                ap_naming_dict[name] = {}
+                for item in group.values:
                     esx_name, final_name, _ = item
-                else:
-                    esx_name, final_name = item
-                ap_naming_dict[name][esx_name] = final_name.lower() if lowercase_name else final_name
+                    ap_naming_dict[name][esx_name] = final_name.lower() if lowercase_name else final_name
+        else:
+            values = df_without_empty_names.loc[:,excel_columns_to_read].values.tolist()
+            for esx_name, final_name in values:
+                ap_naming_dict[esx_name] = final_name.lower() if lowercase_name else final_name
         return ap_naming_dict
 
-    def rename_aps_floor_dependent(self, esx_filepath:str):
+    def rename_aps_floor_dependent(self, esx_filepath:str) -> Dict:
+        site_name = esx_filepath[:len(esx_filepath)-4].split('\\')[-1]
         ap_naming_dict = self.create_ap_naming_dict(floor_dependent_naming=True)
         new_esx_filepath = self.copy_esx_file(esx_filepath)
+        results = {'task':'rename esx ap', site_name:{'success': [], 'error': []}}
         with ZipFile(new_esx_filepath, 'a') as zf:
             with zf.open('floorPlans.json', 'r') as fp_f:
                 fp_json = json.loads(fp_f.read())
@@ -202,10 +230,21 @@ class EkahauWriter:
                         floor_name = floorplan_name[ap['location']['floorPlanId']]
                         try:
                             ap['name'] = ap_naming_dict[floor_name][ap['name']]
+                            results[site_name]['success'].append(ap['name'])
                         except KeyError:
-                            print(f'found AP in esx file that is not in the excel sheet: {ap["name"]}')
+                            print(f'found AP in esx file that is not in the excel sheet in {site_name}: {ap["name"]}')
+                            results[site_name]['error'].append(ap['name'])
                 zf.writestr('accessPoints.json', json.dumps(ap_json))
-        return ap_json
+
+        successfully_renamed_aps = results[site_name]['success']
+        for floor in ap_naming_dict:
+            floor_aps = ap_naming_dict[floor]
+            for ap in floor_aps:
+                new_ap_name = floor_aps[ap]
+                if not new_ap_name in successfully_renamed_aps:
+                    results[site_name]['error'].append(new_ap_name)
+
+        return results
 
     def get_floorplan_json_from_file(self, esx_filepath:str) -> Dict[str, str]:
         with ZipFile(esx_filepath) as esx_f:

@@ -3,9 +3,10 @@ sites:
     ap_excel_file: 'path\to\excel\file.xlsx'
     sheet_name: 'sheet where config data is found'
     header_column_names:
-        site: 'Site\nBld\nFloor'
+        site_name: 'Site\nBld\nFloor'
         ap_name: 'New WAP Name'
         ap_mac: 'New WAP \nMAC Address'
+        esx_ap_name: 'WAP location #\non Drawing'
     dropna_header: 'New WAP \nMAC Address'
     groupby: 'Site\nBld\nFloor'
     site:
@@ -17,6 +18,9 @@ sites:
     tasks:
         - 'assign ap'
         - 'name ap'
+        - 'rename esx ap'
+        - 'create per floor esx files'
+    lowercase_ap_names: false
 login:
     username: 'username'
     password: 'password'
