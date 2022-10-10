@@ -109,6 +109,21 @@ class ExcelWriter:
                     full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
                     success_data = result[site_name]['success']
                     self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)
+
+    def write_configs_to_file(self):
+        for result in self.results:
+            sheet_name = result['task']
+            for key in result:
+                if key != 'task':
+                    site_name = key
+                    out_filename = ''
+                    if sheet_name in {'assign ap', 'name ap'}:
+                        out_filename = f'{self.sn_to_id[self.name_assoc[site_name]]}.xlsx'
+                    elif sheet_name in {'rename esx ap'}:
+                        out_filename = f'{site_name}.xlsx' 
+                    full_outfile_path = os.path.join(os.getcwd(), 'data', out_filename)
+                    success_data = result[site_name]['success']
+                    self.write_success_data_to_worksheet(sheet_name, success_data, full_outfile_path)
     
     def write_success_data_to_worksheet(self, sheet_name:str, success_data:List, out_filename:str):
         dataframe = pandas.DataFrame(data=success_data, columns=self.task_headers[sheet_name])

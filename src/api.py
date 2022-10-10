@@ -36,6 +36,7 @@ class MistAPIHandler:
         "get_mxedge_clusters" : "orgs/{}/mxclusters",
         "wlan" : "orgs/{}/wlans",
         "import_map" : "sites/{}/maps/import",
+        "org_import_map" : "orgs/{}/maps/import"
     }
     sites  = {}
     org_id = ''
@@ -325,7 +326,7 @@ class MistAPIHandler:
     
     def _make_multi_api_call(self, full_api_path:str, call_body, headers:Dict) -> Dict[str,str]:
         headers['X-CSRFTOKEN'] = self.headers['X-CSRFTOKEN']
-        response = requests.request('post', full_api_path, data=call_body, headers=headers,cookies=self.cookies)
+        response = requests.request('post', full_api_path, data=call_body, headers=headers, cookies=self.cookies)
         if response.status_code == 200:
             return response.json()
         else:

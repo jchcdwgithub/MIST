@@ -12,10 +12,12 @@ pip install -r requirements.txt
 
 ## Supported Configuration Tasks:
 
-Currently there are two tasks that are supported. They are:
+Currently there are four tasks that are supported. They are:
 
 1. assign ap
 2. name ap
+3. rename esx ap
+4. create per floor esx files
 
 The exact names listed above should be included in the config yaml file under sites. (See usage for more information.)
 
@@ -41,7 +43,7 @@ The names of the columns that contain the configuration information. There are t
 The column name that contains the AP name information.
 ###### ap_mac
 The column name that contains the AP MAC information.
-###### site
+###### site_name
 The column name that contains the Site name information.
 ###### note
 If you are just planning on using the AP installation excel sheet as is then none of this information needs to be changed from the example config file.
