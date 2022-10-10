@@ -1,6 +1,7 @@
 org: 'Your Org Name'
 sites:
     ap_excel_file: 'path\to\excel\file.xlsx'
+    esx_file: 'path\to\esx\file.esx'
     sheet_name: 'sheet where config data is found'
     header_column_names:
         site_name: 'Site\nBld\nFloor'

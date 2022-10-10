@@ -4,6 +4,7 @@ test_runner.py
 __pycache__
 /Sentara
 /dev
-*.xlsx
+/*.xlsx
+/data/*
 *.csv
 /config.yml

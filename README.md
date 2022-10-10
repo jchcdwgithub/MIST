@@ -35,6 +35,8 @@ The name of the organization that you're pushing configuration to. This must mat
 sites: This contains the list of sites that you want to configure and also other information for those sites, like the tasks you'd like to perform on those sites. Here's a breakdown of the attributes in the sites section:
 ##### ap_excel_file
 This is the path, relative to the MIST folder or an absolute path to where the AP Installation excel sheet is.
+##### esx_file
+This is the path, relative to the MIST folder or an absolute path to where the Ekahau file is.
 ##### sheet_name
 There are multiple sheets in the AP Installation file. The name of the sheet where the configuration information sheet must be specified.
 ##### header_column_names
@@ -45,6 +47,8 @@ The column name that contains the AP name information.
 The column name that contains the AP MAC information.
 ###### site_name
 The column name that contains the Site name information.
+###### esx_ap_name
+The column name that contains the AP names defined in the esx file 
 ###### note
 If you are just planning on using the AP installation excel sheet as is then none of this information needs to be changed from the example config file.
 ##### dropna_header
@@ -69,3 +73,17 @@ Your password
 After defining the config.yml file, you can run the script. On the CLI type:
 
 python mist_helper.py
+
+## Tasks
+### Assign AP
+This task uses the AP MAC and site information to push a list of MACs to a site.
+### Name AP
+This task uses names the APs according to the New WAP Name column in the installer excel workbook.
+### Rename ESX AP
+This task works against the Ekahau file defined in the config.yml esx_file variable under sites. It renames the APs inside the Ekahau file to the AP name on the Mist dashboard. There are a few scenarios that this task can encounter:
+#### Unique AP names in the Ekahau file
+If all the AP names inside the Ekahau file are unique there is no added work that is required for the tool to work.
+#### Repeat AP names
+If there is at least one name that is repeated anywhere in the Ekahau file then the maps inside the file will need to be renamed to the name found in the Site Bld Floor column of the excel sheet. For example if inside the Ekahau file the map name for the first floor is 1st Floor but the name in the excel sheet is Customer Site Flr 1 then the map will need to be renamed to Customer Site Flr 1. Repeat for all maps in the Ekahau file.
+### Create per floor esx files
+This will split the Ekahau file into multiple files, one for each map that is found inside the Ekahau file. This task was primary created due to the Mist dashboard's inconsistent performance parsing multi-floor Ekahau files.
