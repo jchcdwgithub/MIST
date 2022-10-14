@@ -159,7 +159,7 @@ def create_temp_site_excel() -> str:
     with pandas.ExcelWriter(full_file_path) as writer:
         df = pandas.DataFrame(data=test_macs, columns=['MAC'])
         df.to_excel(writer, index=False, sheet_name='assign ap')
-        test_mac_names = [['aabbccddeef1', 'ap-1'], ['aabbccddeef2', 'ap-2']]
+        test_mac_names = [['ap-1', 'aabbccddeef1'], ['ap-2', 'aabbccddeef2']]
         df = pandas.DataFrame(data=test_mac_names, columns=['MAC', 'NAME'])
         df.to_excel(writer, sheet_name='name ap', index=False)
     yield full_file_path

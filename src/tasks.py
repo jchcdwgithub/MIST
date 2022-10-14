@@ -174,16 +174,21 @@ class AssignTask:
                 assign_jsons.append(assign_json)
             except KeyError:
                 pass
-        
+         
         for assign_json,site in zip(assign_jsons, self.smn.keys()):
             sites[site] = {'success':[], 'error':[]}
-            print(f'assigning APs to site: {self.name_assoc[site]}')
-            try:
-                response = self.handler.assign_inventory_to_site(assign_json)
-                sites[site]['success'] = response['success']
-                sites[site]['error'] = response['error']
-            except Exception as e:
-                print(e)
+            if len(assign_json['macs']) > 0:
+                print(f'assigning APs to site: {self.name_assoc[site]}')
+                try:
+                    response = self.handler.assign_inventory_to_site(assign_json)
+                    sites[site]['success'] = response['success']
+                    sites[site]['error'] = response['error']
+                except Exception as e:
+                    print(e)
+            else:
+                print(f'No new MACs to assign to site: {self.name_assoc[site]}')
+                sites[site]['success'] = []
+                sites[site]['error'] = []
         return sites
 
     def _convert_site_mac_dict_to_tuples(self, site_mac_name:Dict) -> Tuple:
@@ -205,7 +210,7 @@ class NameAPTask:
         id_to_name = {}
         results = {'task':'name ap'}
         for site in self.smn:
-            print(f'naming APs for site: {site}')
+            print(f'naming APs for site: {self.name_assoc[site]}')
             site_id = self.handler.sites[self.name_assoc[site]]
             results[site] = {'success':[], 'error':[]}
             try:
@@ -369,7 +374,7 @@ class TaskManager:
                 site_mac_name = ds[site]
                 site_mac_name_copy = site_mac_name.copy()
                 for mac in site_mac_name:
-                    mac_to_name_pair = [mac, site_mac_name[mac]]
+                    mac_to_name_pair = [site_mac_name[mac], mac]
                     if mac_to_name_pair in named_aps:
                         site_mac_name_copy.pop(mac)
                 ds[site] = site_mac_name_copy
@@ -390,7 +395,7 @@ class TaskManager:
                 site_macs = ds[site]
                 site_macs_copy = site_macs.copy()
                 for mac in site_macs:
-                    if mac in assigned_mac :
+                    if mac.lower() in assigned_mac :
                         site_macs_copy.remove(mac)
                 ds[site] = site_macs_copy
             return ds
