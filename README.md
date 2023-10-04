@@ -8,7 +8,7 @@ Download the project to your local environment and navigate into the MIST folder
 
 You can then download the dependencies that the script needs with:
 
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 ## Supported Configuration Tasks:
 
@@ -75,7 +75,7 @@ Your password
 
 After defining the config.yml file, you can run the script. On the CLI type:
 
-python mist_helper.py
+`python mist_helper.py`
 
 ## Tasks
 ### Assign AP
