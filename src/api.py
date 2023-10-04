@@ -25,7 +25,10 @@ class MistAPIHandler:
         "site" : "sites/{}",
         "site_group" : "orgs/{}/sitegroups",
         "site_devices" : "sites/{}/devices",
+        "site_devices_stats" : "sites/{}/stats/devices",
         "device_config" : "sites/{}/devices/{}",
+        "device_profiles" : "orgs/{}/deviceprofiles?type=ap",
+        "assign_to_device_profile" : "orgs/{}/deviceprofiles/{}/assign",
         "inventory" : "orgs/{}/inventory",
         "bounce_tunterm_data_ports" : "orgs/{}/mxedges/{}/services/tunterm/bounce_port",
         "mistedge_restart" : "orgs/{}/mxedges/{}/restart",
@@ -157,9 +160,30 @@ class MistAPIHandler:
 
         return self._action_api_endpoint('site_devices', [site_id])
 
+    def get_site_devices_stats(self, site_id:str) -> Dict[str, str]:
+
+        return self._action_api_endpoint('site_devices_stats', [site_id])
+
     def config_site_device(self, site_id:str, device_id:str, device_info: Dict) -> Dict[str, str]:
 
         return self._action_api_endpoint('device_config', [site_id, device_id], call_body=device_info, action='put')
+    
+    def get_device_profiles(self, org_id:str) -> Dict:
+
+        return self._action_api_endpoint('device_profiles', [org_id])
+
+    def assign_devices_to_device_profile(self, org_id:str, deviceprofile_id:str, devices:list[str]):
+        """
+        {
+            'macs' : [
+                mac1,
+                mac2,
+                ...
+            ]
+        }
+        """
+
+        return self._action_api_endpoint('assign_to_device_profile', [org_id, deviceprofile_id], call_body=devices, action='post')
 
     def get_inventory(self, org_id:str = '') -> Dict[str,str]:
 

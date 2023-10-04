@@ -16,8 +16,9 @@ Currently there are four tasks that are supported. They are:
 
 1. assign ap
 2. name ap
-3. rename esx ap
-4. create per floor esx files
+3. assign aps to device profile
+4. rename esx ap
+5. create per floor esx files
 
 The exact names listed above should be included in the config yaml file under sites. (See usage for more information.)
 
@@ -39,6 +40,8 @@ This is the path, relative to the MIST folder or an absolute path to where the A
 This is the path, relative to the MIST folder or an absolute path to where the Ekahau file is.
 ##### sheet_name
 There are multiple sheets in the AP Installation file. The name of the sheet where the configuration information sheet must be specified.
+##### device_profile
+This is the device profile name to assign APs to. This is required if the task 'assign aps to device profile' is being used.
 ##### header_column_names
 The names of the columns that contain the configuration information. There are three that are required for the current tasks:
 ###### ap_name
@@ -79,6 +82,8 @@ python mist_helper.py
 This task uses the AP MAC and site information to push a list of MACs to a site.
 ### Name AP
 This task uses names the APs according to the New WAP Name column in the installer excel workbook.
+### Assign APs to device profile
+This tasks assigns the APs in a site to the specified device profile defined in the config.yml file.
 ### Rename ESX AP
 This task works against the Ekahau file defined in the config.yml esx_file variable under sites. It renames the APs inside the Ekahau file to the AP name on the Mist dashboard. There are a few scenarios that this task can encounter:
 #### Unique AP names in the Ekahau file

@@ -88,6 +88,7 @@ class ExcelWriter:
         'name ap' : ['AP Name', 'MAC'],
         'rename esx ap': ['renamed aps'],
         'create per floor esx files' : ['Files'],
+        'assign aps to device profile' : ['Device Profile Assigned']
     }
 
     def __init__(self, results:Dict, site_name_to_id:Dict, name_association:Dict[str, str]):

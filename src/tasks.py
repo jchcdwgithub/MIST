@@ -148,6 +148,46 @@ class SiteMac:
     def __str__(self):
         return 'site_to_mac'
 
+class AssignDeviceProfileTask:
+
+    def __init__(self, site_mac:Dict, deviceprofile_id:str, handler:MistAPIHandler):
+        self.smn = site_mac
+        self.deviceprofile_id = deviceprofile_id
+        self.handler = handler
+        self.order = 1
+
+    def perform_task(self):
+
+        assign_jsons = []
+        sites = {'task':'assign aps to device profile'}
+        for site in self.smn:
+            try:
+                site_macs = self.smn[site]
+                assign_json = {
+                    'op' : 'assign to device profile',
+                    'macs' : site_macs
+                }
+                assign_jsons.append(assign_json)
+            except KeyError:
+                pass
+        
+        for assign_json in assign_jsons:
+            sites[site] = {'success':[], 'error':[]}
+            if len(assign_json['macs']) > 0:
+                print('Assigning APs to Device Profile')
+                try:
+                    mac_payload = {'macs':assign_json['macs']}
+                    self.handler.assign_devices_to_device_profile(self.handler.org_id, self.deviceprofile_id, mac_payload)
+                except Exception as e:
+                    print(e)
+            else:
+                print('No MACs to assign to device profile')
+                sites[site]['success'] = []
+                sites[site]['error'] = []
+        
+        return sites
+
+
 class AssignTask:
 
     def __init__(self, site_mac:Dict, site_name_to_id:Dict[str, str], name_association:Dict[str,str], handler:MistAPIHandler):
@@ -284,6 +324,7 @@ class TaskManager:
         'name ap' : [NameAssoc, SiteMacName],
         'rename esx ap' : [NameAssoc],
         'create per floor esx files' : [NameAssoc],
+        'assign aps to device profile' : [NameAssoc, SiteMac],
     }
 
     def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None, esx_writer:EkahauWriter = None):
@@ -304,6 +345,18 @@ class TaskManager:
 
         self.handler.save_org_id_by_name(config['org'])
         self.handler.populate_site_id_dict()
+
+        if 'assign aps to device profile' in config['sites']['tasks']:
+            if 'device_profile' in config['sites']:
+                device_profile_name = config['sites']['device_profile']
+                deviceprofiles = self.handler.get_device_profiles(self.handler.org_id)
+                for deviceprofile in deviceprofiles:
+                    if device_profile_name == deviceprofile['name']:
+                        self.deviceprofile_id = deviceprofile['id']
+                        break
+            else:
+                print('The task assign aps to device profile requires a device_profile parameter to be set in the config.yml file. Set it and try again.')
+                exit()
 
         self.site_name_to_id = self.handler.sites
         print('reading information from excel file...')
@@ -411,6 +464,8 @@ class TaskManager:
                 task_instance = RenameAPEsxTask(self.esx_writer)
             elif task == 'create per floor esx files':
                 task_instance = CreatePerFloorEsxFilesTask(self.esx_writer)
+            elif task == 'assign aps to device profile':
+                task_instance = AssignDeviceProfileTask(self.data_structures['site_to_mac'], self.deviceprofile_id, self.handler)
             else:
                 raise ValueError(f'Unknown task: {task}. Available tasks are:\nassign ap\nname ap\nrename esx ap\ncreate per floor esx files\n')
             self.execute_queue.append(task_instance)
