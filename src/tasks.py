@@ -317,36 +317,57 @@ class CreatePerFloorEsxFilesTask:
             print('file created.')
         return result
 
+class ExportEkahauAPsTask:
+
+    def __init__(self, esx_writer:EkahauWriter):
+        self.esx_writer = esx_writer
+        self.order = 2
+
+    def perform_task(self):
+        esx_filepath = self.esx_writer.config['sites']['esx_file']
+        prefix = self.esx_writer.config['sites'].get('ap_name_prefix', '')
+        output = self.esx_writer.config['sites'].get('export_ekahau_ap_output')
+        path = self.esx_writer.export_aps_to_xlsx(esx_filepath, output, prefix)
+        print(f'Wrote Ekahau AP export to {path}')
+        return {'task': 'export ekahau aps', 'export': {'success': [path], 'error': []}}
+
 class TaskManager:
+
+    EKAHU_ONLY_TASKS = {'rename esx ap', 'create per floor esx files', 'export ekahau aps'}
 
     task_datastructure = {
         'assign ap' : [NameAssoc, SiteMac],
         'name ap' : [NameAssoc, SiteMacName],
         'rename esx ap' : [NameAssoc],
         'create per floor esx files' : [NameAssoc],
+        'export ekahau aps' : [],
         'assign aps to device profile' : [NameAssoc, SiteMac],
     }
 
     def __init__(self, config:Dict = {}, handler:MistAPIHandler = None, writer:ExcelWriter = None, esx_writer:EkahauWriter = None):
-        username = config['login']['username']
-        password = config['login']['password']
-        login_params = {
-            'username':username,
-            'password':password
-            }
         self.config = config
         self.tasks = config['sites']['tasks']
-
-        print('logging in...')
-        self.handler = handler('usr_pw', login_params)
         self.writer = writer
-
         self.esx_writer = esx_writer
+        self.ekahau_only = set(self.tasks) <= self.EKAHU_ONLY_TASKS
 
-        self.handler.save_org_id_by_name(config['org'])
-        self.handler.populate_site_id_dict()
+        if not self.ekahau_only:
+            username = config['login']['username']
+            password = config['login']['password']
+            login_params = {
+                'username':username,
+                'password':password
+                }
+            print('logging in...')
+            self.handler = handler('usr_pw', login_params)
+            self.handler.save_org_id_by_name(config['org'])
+            self.handler.populate_site_id_dict()
+            self.site_name_to_id = self.handler.sites
+        else:
+            self.handler = None
+            self.site_name_to_id = {}
 
-        if 'assign aps to device profile' in config['sites']['tasks']:
+        if not self.ekahau_only and 'assign aps to device profile' in config['sites']['tasks']:
             if 'device_profile' in config['sites']:
                 device_profile_name = config['sites']['device_profile']
                 deviceprofiles = self.handler.get_device_profiles(self.handler.org_id)
@@ -358,8 +379,8 @@ class TaskManager:
                 print('The task assign aps to device profile requires a device_profile parameter to be set in the config.yml file. Set it and try again.')
                 exit()
 
-        self.site_name_to_id = self.handler.sites
-        print('reading information from excel file...')
+        if not self.ekahau_only:
+            print('reading information from excel file...')
         self._create_data_structures()
 
         if self.config['sites']['lowercase_ap_names'] == True and 'site_mac_name' in self.data_structures:
@@ -464,10 +485,12 @@ class TaskManager:
                 task_instance = RenameAPEsxTask(self.esx_writer)
             elif task == 'create per floor esx files':
                 task_instance = CreatePerFloorEsxFilesTask(self.esx_writer)
+            elif task == 'export ekahau aps':
+                task_instance = ExportEkahauAPsTask(self.esx_writer)
             elif task == 'assign aps to device profile':
                 task_instance = AssignDeviceProfileTask(self.data_structures['site_to_mac'], self.deviceprofile_id, self.handler)
             else:
-                raise ValueError(f'Unknown task: {task}. Available tasks are:\nassign ap\nname ap\nrename esx ap\ncreate per floor esx files\n')
+                raise ValueError(f'Unknown task: {task}. Available tasks are:\nassign ap\nname ap\nrename esx ap\ncreate per floor esx files\nexport ekahau aps\n')
             self.execute_queue.append(task_instance)
     
     def execute_tasks(self):

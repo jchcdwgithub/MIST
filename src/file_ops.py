@@ -151,6 +151,31 @@ class EkahauWriter:
     def __init__(self, config:Dict):
         self.config = config
 
+    def read_aps_from_esx(self, esx_filepath:str) -> List[Dict]:
+        with ZipFile(esx_filepath) as zf:
+            with zf.open('accessPoints.json') as ap_f:
+                esx_aps = json.loads(ap_f.read())
+        return [
+            {'name': ap['name'], 'model': ap.get('model', '')}
+            for ap in esx_aps['accessPoints']
+        ]
+
+    def export_aps_to_xlsx(self, esx_filepath:str, output_filepath:str=None, name_prefix:str='') -> str:
+        if not output_filepath:
+            output_filepath = esx_filepath[:-4] + '_aps.xlsx'
+        output_dir = os.path.dirname(output_filepath)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        rows = []
+        for ap in self.read_aps_from_esx(esx_filepath):
+            name = ap['name']
+            if name_prefix:
+                name = name_prefix + name
+            rows.append({'AP Name': name, 'Model': ap['model']})
+        dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model'])
+        dataframe.to_excel(output_filepath, sheet_name='ekahau aps', index=False)
+        return output_filepath
+
     def replace_ap_names_in_esx_file(self, esx_filepath:str):
 
         esx_to_final_naming = self.create_ap_naming_dict()

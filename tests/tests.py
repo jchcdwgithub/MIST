@@ -1154,3 +1154,65 @@ def test_rename_ap_floor_dependent_returns_a_list_of_successful_and_failed_to_re
   }
   generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
   assert expected == generated
+
+def test_read_aps_from_esx_returns_name_and_model(create_temp_esx_file):
+  esx_writer = file_ops.EkahauWriter(get_test_config_data())
+  aps = esx_writer.read_aps_from_esx(create_temp_esx_file)
+  assert len(aps) == 5
+  assert aps[0] == {'name': 'ap-1', 'model': ''}
+
+def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
+  esx_writer = file_ops.EkahauWriter(get_test_config_data())
+  output = os.path.join(os.getcwd(), 'dev', 'test_export_aps.xlsx')
+  prefixed_output = os.path.join(os.getcwd(), 'dev', 'test_export_aps_prefixed.xlsx')
+  try:
+    path = esx_writer.export_aps_to_xlsx(create_temp_esx_file, output)
+    assert path == output
+    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    assert list(df.columns) == ['AP Name', 'Model']
+    assert len(df) == 5
+    assert df['AP Name'].tolist() == ['ap-1'] * 5
+    assert df['Model'].tolist() == [''] * 5
+
+    esx_writer.export_aps_to_xlsx(create_temp_esx_file, prefixed_output, 'PRE-')
+    df_prefixed = pandas.read_excel(prefixed_output, sheet_name='ekahau aps')
+    assert df_prefixed['AP Name'].tolist() == ['PRE-ap-1'] * 5
+  finally:
+    for filepath in (output, prefixed_output):
+      if os.path.exists(filepath):
+        os.remove(filepath)
+
+def test_export_aps_to_xlsx_reads_model_from_esx():
+  ap_json = {
+    'accessPoints': [
+      {'name': 'AP-A', 'model': 'AP43'},
+      {'name': 'AP-B'},
+    ]
+  }
+  temp_esx = os.path.join(os.getcwd(), 'dev', 'test_models.esx')
+  output = os.path.join(os.getcwd(), 'dev', 'test_models_aps.xlsx')
+  with ZipFile(temp_esx, 'w') as zf:
+    zf.writestr('accessPoints.json', json.dumps(ap_json))
+  try:
+    esx_writer = file_ops.EkahauWriter(get_test_config_data())
+    esx_writer.export_aps_to_xlsx(temp_esx, output)
+    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    assert df['AP Name'].tolist() == ['AP-A', 'AP-B']
+    assert df['Model'].tolist() == ['AP43', '']
+  finally:
+    if os.path.exists(temp_esx):
+      os.remove(temp_esx)
+    if os.path.exists(output):
+      os.remove(output)
+
+def test_create_tasks_includes_export_ekahau_aps_task(create_temp_esx_file):
+  config = get_test_config_data()
+  config['sites']['tasks'] = ['export ekahau aps']
+  config['sites']['esx_file'] = create_temp_esx_file
+  esx_writer = file_ops.EkahauWriter(config)
+  task_manager = tasks.TaskManager(config=config, handler=FakeAPIHandler, esx_writer=esx_writer)
+  assert task_manager.ekahau_only is True
+  assert task_manager.handler is None
+  task_manager.create_tasks()
+  assert len(task_manager.execute_queue) == 1
+  assert isinstance(task_manager.execute_queue[0], tasks.ExportEkahauAPsTask)

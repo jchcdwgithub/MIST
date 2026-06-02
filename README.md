@@ -12,13 +12,14 @@ You can then download the dependencies that the script needs with:
 
 ## Supported Configuration Tasks:
 
-Currently there are four tasks that are supported. They are:
+Currently there are six tasks that are supported. They are:
 
 1. assign ap
 2. name ap
 3. assign aps to device profile
 4. rename esx ap
 5. create per floor esx files
+6. export ekahau aps
 
 The exact names listed above should be included in the config yaml file under sites. (See usage for more information.)
 
@@ -38,6 +39,10 @@ sites: This contains the list of sites that you want to configure and also other
 This is the path, relative to the MIST folder or an absolute path to where the AP Installation excel sheet is.
 ##### esx_file
 This is the path, relative to the MIST folder or an absolute path to where the Ekahau file is.
+##### ap_name_prefix
+Optional prefix prepended to each AP name when using the `export ekahau aps` task (for example `SITE-A-`). No separator is added automatically; include any dash or underscore in the prefix if you want one.
+##### export_ekahau_ap_output
+Optional path for the xlsx file produced by `export ekahau aps`. If omitted, the file is written next to the esx file as `{esx_basename}_aps.xlsx`.
 ##### sheet_name
 There are multiple sheets in the AP Installation file. The name of the sheet where the configuration information sheet must be specified.
 ##### device_profile
@@ -92,3 +97,5 @@ If all the AP names inside the Ekahau file are unique there is no added work tha
 If there is at least one name that is repeated anywhere in the Ekahau file then the maps inside the file will need to be renamed to the name found in the Site Bld Floor column of the excel sheet. For example if inside the Ekahau file the map name for the first floor is 1st Floor but the name in the excel sheet is Customer Site Flr 1 then the map will need to be renamed to Customer Site Flr 1. Repeat for all maps in the Ekahau file.
 ### Create per floor esx files
 This will split the Ekahau file into multiple files, one for each map that is found inside the Ekahau file. This task was primary created due to the Mist dashboard's inconsistent performance parsing multi-floor Ekahau files.
+### Export Ekahau APs
+This task reads AP names and models from the Ekahau file defined in `esx_file` and writes an xlsx spreadsheet with columns `AP Name` and `Model`. Use `ap_name_prefix` to prepend a string to each exported name. When this is the only task (or combined with other Ekahau-only tasks: `rename esx ap`, `create per floor esx files`), the script does not log into the Mist dashboard.
