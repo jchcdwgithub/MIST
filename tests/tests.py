@@ -1155,17 +1155,17 @@ def test_rename_ap_floor_dependent_returns_a_list_of_successful_and_failed_to_re
   generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
   assert expected == generated
 
-def test_normalize_export_ap_name_strips_space_separated_suffix():
-  assert file_ops.normalize_export_ap_name('AP-765 Omni') == 'AP-765'
-  assert file_ops.normalize_export_ap_name('ap-765 Omni') == 'ap-765'
+def test_normalize_export_ap_model_strips_space_separated_suffix():
+  assert file_ops.normalize_export_ap_model('AP-765 Omni') == 'AP-765'
+  assert file_ops.normalize_export_ap_model('ap-765 Omni') == 'ap-765'
 
-def test_normalize_export_ap_name_keeps_trailing_characters_before_space():
-  assert file_ops.normalize_export_ap_name('Measured AP-33:ab') == 'AP-33:ab'
-  assert file_ops.normalize_export_ap_name('AP-33:ab extra') == 'AP-33:ab'
+def test_normalize_export_ap_model_keeps_trailing_characters_before_space():
+  assert file_ops.normalize_export_ap_model('Measured AP-33:ab') == 'AP-33:ab'
+  assert file_ops.normalize_export_ap_model('AP-33:ab extra') == 'AP-33:ab'
 
-def test_normalize_export_ap_name_returns_unchanged_when_no_match():
-  assert file_ops.normalize_export_ap_name('ap-1') == 'ap-1'
-  assert file_ops.normalize_export_ap_name('AP072') == 'AP072'
+def test_normalize_export_ap_model_returns_unchanged_when_no_match():
+  assert file_ops.normalize_export_ap_model('ap-1') == 'ap-1'
+  assert file_ops.normalize_export_ap_model('AP072') == 'AP072'
 
 def test_apply_ap_name_prefix_template_orders_segments_and_preserves_literals():
   result = file_ops.apply_ap_name_prefix_template(
@@ -1286,6 +1286,29 @@ def test_export_esx_folder_to_xlsx(create_temp_esx_file, get_test_ap_json, get_t
       for filename in os.listdir(output_dir):
         os.remove(os.path.join(output_dir, filename))
       os.rmdir(output_dir)
+
+def test_export_aps_to_xlsx_normalizes_model_column():
+  ap_json = {
+    'accessPoints': [
+      {'name': 'Lobby AP', 'model': 'AP-765 Omni'},
+      {'name': 'Hall AP', 'model': 'AP43'},
+    ]
+  }
+  temp_esx = os.path.join(os.getcwd(), 'dev', 'test_model_norm.esx')
+  output = os.path.join(os.getcwd(), 'dev', 'test_model_norm_aps.xlsx')
+  with ZipFile(temp_esx, 'w') as zf:
+    zf.writestr('accessPoints.json', json.dumps(ap_json))
+  try:
+    esx_writer = file_ops.EkahauWriter(get_test_config_data())
+    esx_writer.export_aps_to_xlsx(temp_esx, output)
+    df = pandas.read_excel(output, sheet_name='test_model_norm')
+    assert df['AP Name'].tolist() == ['Lobby AP', 'Hall AP']
+    assert df['Model'].tolist() == ['AP-765', 'AP43']
+  finally:
+    if os.path.exists(temp_esx):
+      os.remove(temp_esx)
+    if os.path.exists(output):
+      os.remove(output)
 
 def test_export_aps_to_xlsx_reads_model_from_esx():
   ap_json = {

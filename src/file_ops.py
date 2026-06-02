@@ -173,12 +173,12 @@ def sanitize_excel_sheet_name(name:str) -> str:
         name = name.replace(char, '_')
     return name[:31]
 
-def normalize_export_ap_name(name:str) -> str:
+def normalize_export_ap_model(model:str) -> str:
     '''Keep AP- plus digits and attached non-space suffix; drop space-separated trailing text.'''
-    match = re.search(r'AP-\d+[^\s]*', name, re.IGNORECASE)
+    match = re.search(r'AP-\d+[^\s]*', model, re.IGNORECASE)
     if match:
         return match.group(0)
-    return name
+    return model
 
 class EkahauWriter:
 
@@ -226,7 +226,7 @@ class EkahauWriter:
             prefix = legacy_prefix
         else:
             prefix = ''
-        return prefix + normalize_export_ap_name(ap['name'])
+        return prefix + ap['name']
 
     def export_aps_to_xlsx(
         self,
@@ -254,7 +254,11 @@ class EkahauWriter:
                 filename_stem=filename_stem,
                 legacy_prefix=legacy_prefix,
             )
-            rows.append({'AP Name': name, 'Model': ap['model'], 'Serial': ''})
+            rows.append({
+                'AP Name': name,
+                'Model': normalize_export_ap_model(ap['model']),
+                'Serial': '',
+            })
         dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model', 'Serial'])
         sheet_name = sanitize_excel_sheet_name(filename_stem)
         with pandas.ExcelWriter(output_filepath, engine='openpyxl') as writer:
