@@ -173,6 +173,13 @@ def sanitize_excel_sheet_name(name:str) -> str:
         name = name.replace(char, '_')
     return name[:31]
 
+def normalize_export_ap_name(name:str) -> str:
+    '''Keep AP- plus digits and attached non-space suffix; drop space-separated trailing text.'''
+    match = re.search(r'AP-\d+[^\s]*', name, re.IGNORECASE)
+    if match:
+        return match.group(0)
+    return name
+
 class EkahauWriter:
 
     def __init__(self, config:Dict):
@@ -219,7 +226,7 @@ class EkahauWriter:
             prefix = legacy_prefix
         else:
             prefix = ''
-        return prefix + ap['name']
+        return prefix + normalize_export_ap_name(ap['name'])
 
     def export_aps_to_xlsx(
         self,

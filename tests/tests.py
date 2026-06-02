@@ -1155,6 +1155,18 @@ def test_rename_ap_floor_dependent_returns_a_list_of_successful_and_failed_to_re
   generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
   assert expected == generated
 
+def test_normalize_export_ap_name_strips_space_separated_suffix():
+  assert file_ops.normalize_export_ap_name('AP-765 Omni') == 'AP-765'
+  assert file_ops.normalize_export_ap_name('ap-765 Omni') == 'ap-765'
+
+def test_normalize_export_ap_name_keeps_trailing_characters_before_space():
+  assert file_ops.normalize_export_ap_name('Measured AP-33:ab') == 'AP-33:ab'
+  assert file_ops.normalize_export_ap_name('AP-33:ab extra') == 'AP-33:ab'
+
+def test_normalize_export_ap_name_returns_unchanged_when_no_match():
+  assert file_ops.normalize_export_ap_name('ap-1') == 'ap-1'
+  assert file_ops.normalize_export_ap_name('AP072') == 'AP072'
+
 def test_apply_ap_name_prefix_template_orders_segments_and_preserves_literals():
   result = file_ops.apply_ap_name_prefix_template(
     '{filename}-{floor}-{custom}',
