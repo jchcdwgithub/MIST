@@ -1203,10 +1203,11 @@ def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
     path = esx_writer.export_aps_to_xlsx(create_temp_esx_file, output)
     assert path == output
     df = pandas.read_excel(output, sheet_name='ekahau aps')
-    assert list(df.columns) == ['AP Name', 'Model']
+    assert list(df.columns) == ['AP Name', 'Model', 'Serial']
     assert len(df) == 5
     assert df['AP Name'].tolist() == ['ap-1'] * 5
     assert df['Model'].tolist() == [''] * 5
+    assert df['Serial'].fillna('').tolist() == [''] * 5
 
     esx_writer.export_aps_to_xlsx(create_temp_esx_file, prefixed_output, legacy_prefix='PRE-')
     df_prefixed = pandas.read_excel(prefixed_output, sheet_name='ekahau aps')
@@ -1291,6 +1292,7 @@ def test_export_aps_to_xlsx_reads_model_from_esx():
     df = pandas.read_excel(output, sheet_name='ekahau aps')
     assert df['AP Name'].tolist() == ['AP-A', 'AP-B']
     assert df['Model'].tolist() == ['AP43', '']
+    assert df['Serial'].fillna('').tolist() == ['', '']
   finally:
     if os.path.exists(temp_esx):
       os.remove(temp_esx)

@@ -106,7 +106,7 @@ If there is at least one name that is repeated anywhere in the Ekahau file then 
 ### Create per floor esx files
 This will split the Ekahau file into multiple files, one for each map that is found inside the Ekahau file. This task was primary created due to the Mist dashboard's inconsistent performance parsing multi-floor Ekahau files.
 ### Export Ekahau APs
-This task reads AP names and models from an Ekahau file or folder and writes xlsx spreadsheets with columns `AP Name` and `Model`. Set `esx_file` for one file or `esx_folder` to process every `.esx` in a directory (one `{filename}_aps.xlsx` per file).
+This task reads AP names and models from an Ekahau file or folder and writes xlsx spreadsheets with columns `AP Name`, `Model`, and `Serial` (empty, for manual entry). Set `esx_file` for one file or `esx_folder` to process every `.esx` in a directory (one `{filename}_aps.xlsx` per file).
 
 Use `ap_name_prefix_template` to build prefixes with `{filename}`, `{floor}`, and `{custom}` in any order (for example `{filename}-{floor}-{custom}`). `{floor}` resolves per AP from the Ekahau floor plan; `{filename}` is the esx basename for that file. Use `ap_name_prefix` instead for a simple flat prefix on every AP when no template is set.
 

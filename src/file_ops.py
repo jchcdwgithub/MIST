@@ -8,6 +8,7 @@ import yaml
 import re
 import os
 import copy
+import excel
 
 class IOReader:
     def __init__(self, file:str):
@@ -241,9 +242,15 @@ class EkahauWriter:
                 filename_stem=filename_stem,
                 legacy_prefix=legacy_prefix,
             )
-            rows.append({'AP Name': name, 'Model': ap['model']})
-        dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model'])
-        dataframe.to_excel(output_filepath, sheet_name='ekahau aps', index=False)
+            rows.append({'AP Name': name, 'Model': ap['model'], 'Serial': ''})
+        dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model', 'Serial'])
+        sheet_name = 'ekahau aps'
+        with pandas.ExcelWriter(output_filepath, engine='openpyxl') as writer:
+            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+            table_data = [dataframe.columns.tolist()]
+            if len(dataframe) > 0:
+                table_data += dataframe.astype(str).values.tolist()
+            excel.autofit_worksheet_columns(writer.sheets[sheet_name], table_data)
         return output_filepath
 
     def export_esx_folder_to_xlsx(

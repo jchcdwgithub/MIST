@@ -103,6 +103,11 @@ def adjust_column_widths(worksheet,column_widths:Dict[str,int]) -> None:
     for column_letter in column_widths:
         worksheet.column_dimensions[column_letter].width = column_widths[column_letter] + 5
 
+def autofit_worksheet_columns(worksheet, data:List[List[str]], start_column:int=0) -> None:
+    ''' Set each column width from the longest string in that column (including header row). '''
+    column_widths = get_widest_column_widths(start_column, data)
+    adjust_column_widths(worksheet, column_widths)
+
 def swap_rows_and_columns(data:List[List[str]]) -> List[List[str]]:
     ''' Given an array of arrays, swap the rows and columns data. '''
 
