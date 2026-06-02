@@ -324,10 +324,34 @@ class ExportEkahauAPsTask:
         self.order = 2
 
     def perform_task(self):
-        esx_filepath = self.esx_writer.config['sites']['esx_file']
-        prefix = self.esx_writer.config['sites'].get('ap_name_prefix', '')
-        output = self.esx_writer.config['sites'].get('export_ekahau_ap_output')
-        path = self.esx_writer.export_aps_to_xlsx(esx_filepath, output, prefix)
+        sites = self.esx_writer.config['sites']
+        esx_file = sites.get('esx_file')
+        esx_folder = sites.get('esx_folder')
+        if esx_file and esx_folder:
+            raise ValueError('Specify either esx_file or esx_folder in config.yml, not both.')
+        if not esx_file and not esx_folder:
+            raise ValueError('export ekahau aps requires esx_file or esx_folder in config.yml.')
+
+        template = sites.get('ap_name_prefix_template')
+        custom = sites.get('ap_name_prefix_custom', '')
+        legacy = sites.get('ap_name_prefix', '') if not template else ''
+        export_kwargs = {
+            'prefix_template': template,
+            'prefix_custom': custom,
+            'legacy_prefix': legacy,
+        }
+
+        if esx_folder:
+            output_dir = sites.get('export_ekahau_ap_output_dir')
+            paths = self.esx_writer.export_esx_folder_to_xlsx(
+                esx_folder, output_dir, **export_kwargs
+            )
+            for path in paths:
+                print(f'Wrote Ekahau AP export to {path}')
+            return {'task': 'export ekahau aps', 'export': {'success': paths, 'error': []}}
+
+        output = sites.get('export_ekahau_ap_output')
+        path = self.esx_writer.export_aps_to_xlsx(esx_file, output, **export_kwargs)
         print(f'Wrote Ekahau AP export to {path}')
         return {'task': 'export ekahau aps', 'export': {'success': [path], 'error': []}}
 

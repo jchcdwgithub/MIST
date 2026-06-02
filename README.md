@@ -38,11 +38,19 @@ sites: This contains the list of sites that you want to configure and also other
 ##### ap_excel_file
 This is the path, relative to the MIST folder or an absolute path to where the AP Installation excel sheet is.
 ##### esx_file
-This is the path, relative to the MIST folder or an absolute path to where the Ekahau file is.
+This is the path, relative to the MIST folder or an absolute path to where the Ekahau file is. Use this for single-file export with `export ekahau aps` (do not set `esx_folder` at the same time).
+##### esx_folder
+Directory containing `.esx` files to batch-export with `export ekahau aps`. Produces one `{filename}_aps.xlsx` per file. Mutually exclusive with `esx_file`.
 ##### ap_name_prefix
-Optional prefix prepended to each AP name when using the `export ekahau aps` task (for example `SITE-A-`). No separator is added automatically; include any dash or underscore in the prefix if you want one.
+Optional flat prefix prepended to every AP name when using `export ekahau aps` (for example `SITE-A-`). Ignored when `ap_name_prefix_template` is set.
+##### ap_name_prefix_template
+Template for exported AP name prefixes. Placeholders: `{filename}` (esx basename without extension), `{floor}` (floor plan name per AP), `{custom}` (value from `ap_name_prefix_custom`). Literals such as `-` are kept as written. Example: `{filename}-{floor}-{custom}`.
+##### ap_name_prefix_custom
+Value substituted for `{custom}` in `ap_name_prefix_template`.
 ##### export_ekahau_ap_output
-Optional path for the xlsx file produced by `export ekahau aps`. If omitted, the file is written next to the esx file as `{esx_basename}_aps.xlsx`.
+Optional path for the xlsx file produced by single-file `export ekahau aps`. If omitted, the file is written next to the esx file as `{esx_basename}_aps.xlsx`.
+##### export_ekahau_ap_output_dir
+Optional directory for xlsx files when using `esx_folder`. If omitted, each file is written next to its source `.esx` in the folder.
 ##### sheet_name
 There are multiple sheets in the AP Installation file. The name of the sheet where the configuration information sheet must be specified.
 ##### device_profile
@@ -98,4 +106,8 @@ If there is at least one name that is repeated anywhere in the Ekahau file then 
 ### Create per floor esx files
 This will split the Ekahau file into multiple files, one for each map that is found inside the Ekahau file. This task was primary created due to the Mist dashboard's inconsistent performance parsing multi-floor Ekahau files.
 ### Export Ekahau APs
-This task reads AP names and models from the Ekahau file defined in `esx_file` and writes an xlsx spreadsheet with columns `AP Name` and `Model`. Use `ap_name_prefix` to prepend a string to each exported name. When this is the only task (or combined with other Ekahau-only tasks: `rename esx ap`, `create per floor esx files`), the script does not log into the Mist dashboard.
+This task reads AP names and models from an Ekahau file or folder and writes xlsx spreadsheets with columns `AP Name` and `Model`. Set `esx_file` for one file or `esx_folder` to process every `.esx` in a directory (one `{filename}_aps.xlsx` per file).
+
+Use `ap_name_prefix_template` to build prefixes with `{filename}`, `{floor}`, and `{custom}` in any order (for example `{filename}-{floor}-{custom}`). `{floor}` resolves per AP from the Ekahau floor plan; `{filename}` is the esx basename for that file. Use `ap_name_prefix` instead for a simple flat prefix on every AP when no template is set.
+
+When this is the only task (or combined with other Ekahau-only tasks: `rename esx ap`, `create per floor esx files`), the script does not log into the Mist dashboard.

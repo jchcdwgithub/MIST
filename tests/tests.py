@@ -1155,11 +1155,45 @@ def test_rename_ap_floor_dependent_returns_a_list_of_successful_and_failed_to_re
   generated = esx_writer.rename_aps_floor_dependent(create_temp_esx_file)
   assert expected == generated
 
+def test_apply_ap_name_prefix_template_orders_segments_and_preserves_literals():
+  result = file_ops.apply_ap_name_prefix_template(
+    '{filename}-{floor}-{custom}',
+    filename='Site1',
+    floor='Flr-2',
+    custom='HQ',
+  )
+  assert result == 'Site1-Flr-2-HQ'
+
+def test_apply_ap_name_prefix_template_allows_custom_order():
+  result = file_ops.apply_ap_name_prefix_template(
+    '{custom}_{floor}_{filename}',
+    filename='Building',
+    floor='1st',
+    custom='X',
+  )
+  assert result == 'X_1st_Building'
+
+def test_apply_ap_name_prefix_template_rejects_unknown_placeholders():
+  with pytest.raises(ValueError, match='Unknown placeholder'):
+    file_ops.apply_ap_name_prefix_template(
+      '{filename}-{bad}',
+      filename='Site1',
+      floor='',
+      custom='',
+    )
+
 def test_read_aps_from_esx_returns_name_and_model(create_temp_esx_file):
   esx_writer = file_ops.EkahauWriter(get_test_config_data())
   aps = esx_writer.read_aps_from_esx(create_temp_esx_file)
   assert len(aps) == 5
-  assert aps[0] == {'name': 'ap-1', 'model': ''}
+  assert aps[0] == {'name': 'ap-1', 'model': '', 'floor': 'site1 Flr-0'}
+  assert aps[2]['floor'] == 'site1 Flr-2'
+
+def test_read_aps_from_esx_includes_floor(create_temp_esx_file):
+  esx_writer = file_ops.EkahauWriter(get_test_config_data())
+  aps = esx_writer.read_aps_from_esx(create_temp_esx_file)
+  assert all('floor' in ap for ap in aps)
+  assert aps[4]['floor'] == 'site1 Flr-4'
 
 def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
   esx_writer = file_ops.EkahauWriter(get_test_config_data())
@@ -1174,13 +1208,71 @@ def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
     assert df['AP Name'].tolist() == ['ap-1'] * 5
     assert df['Model'].tolist() == [''] * 5
 
-    esx_writer.export_aps_to_xlsx(create_temp_esx_file, prefixed_output, 'PRE-')
+    esx_writer.export_aps_to_xlsx(create_temp_esx_file, prefixed_output, legacy_prefix='PRE-')
     df_prefixed = pandas.read_excel(prefixed_output, sheet_name='ekahau aps')
     assert df_prefixed['AP Name'].tolist() == ['PRE-ap-1'] * 5
   finally:
     for filepath in (output, prefixed_output):
       if os.path.exists(filepath):
         os.remove(filepath)
+
+def test_export_aps_to_xlsx_with_template(create_temp_esx_file):
+  esx_writer = file_ops.EkahauWriter(get_test_config_data())
+  output = os.path.join(os.getcwd(), 'dev', 'test_export_template.xlsx')
+  try:
+    esx_writer.export_aps_to_xlsx(
+      create_temp_esx_file,
+      output,
+      prefix_template='{filename}-{floor}-{custom}',
+      prefix_custom='HQ',
+      filename_stem='test',
+    )
+    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    assert df['AP Name'].tolist() == [
+      'test-site1 Flr-0-HQap-1',
+      'test-site1 Flr-1-HQap-1',
+      'test-site1 Flr-2-HQap-1',
+      'test-site1 Flr-3-HQap-1',
+      'test-site1 Flr-4-HQap-1',
+    ]
+  finally:
+    if os.path.exists(output):
+      os.remove(output)
+
+def test_export_esx_folder_to_xlsx(create_temp_esx_file, get_test_ap_json, get_test_floorplans_json):
+  folder = os.path.join(os.getcwd(), 'dev', 'batch_esx')
+  output_dir = os.path.join(os.getcwd(), 'dev', 'batch_export_out')
+  os.makedirs(folder, exist_ok=True)
+  esx_paths = []
+  try:
+    for name in ('Alpha', 'Beta'):
+      esx_path = os.path.join(folder, f'{name}.esx')
+      with ZipFile(esx_path, 'w') as zf:
+        zf.writestr('accessPoints.json', json.dumps(get_test_ap_json))
+        zf.writestr('floorPlans.json', json.dumps(get_test_floorplans_json))
+      esx_paths.append(esx_path)
+
+    esx_writer = file_ops.EkahauWriter(get_test_config_data())
+    written = esx_writer.export_esx_folder_to_xlsx(
+      folder,
+      output_dir,
+      prefix_template='{filename}-',
+    )
+    assert len(written) == 2
+    alpha_df = pandas.read_excel(os.path.join(output_dir, 'Alpha_aps.xlsx'), sheet_name='ekahau aps')
+    beta_df = pandas.read_excel(os.path.join(output_dir, 'Beta_aps.xlsx'), sheet_name='ekahau aps')
+    assert alpha_df['AP Name'].tolist() == ['Alpha-ap-1'] * 5
+    assert beta_df['AP Name'].tolist() == ['Beta-ap-1'] * 5
+  finally:
+    for esx_path in esx_paths:
+      if os.path.exists(esx_path):
+        os.remove(esx_path)
+    if os.path.isdir(folder):
+      os.rmdir(folder)
+    if os.path.isdir(output_dir):
+      for filename in os.listdir(output_dir):
+        os.remove(os.path.join(output_dir, filename))
+      os.rmdir(output_dir)
 
 def test_export_aps_to_xlsx_reads_model_from_esx():
   ap_json = {

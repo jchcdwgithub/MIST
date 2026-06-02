@@ -146,6 +146,27 @@ class ExcelWriter:
         else:
             dataframe.to_excel(out_filename, sheet_name=sheet_name, index=False)
 
+PREFIX_PLACEHOLDERS = frozenset({'filename', 'floor', 'custom'})
+
+def apply_ap_name_prefix_template(template:str, *, filename:str, floor:str, custom:str) -> str:
+    unknown = set(re.findall(r'\{(\w+)\}', template)) - PREFIX_PLACEHOLDERS
+    if unknown:
+        raise ValueError(
+            f'Unknown placeholder(s) in ap_name_prefix_template: {", ".join(sorted(unknown))}'
+        )
+
+    def replace(match):
+        key = match.group(1)
+        if key == 'filename':
+            return filename
+        if key == 'floor':
+            return floor
+        if key == 'custom':
+            return custom
+        return match.group(0)
+
+    return re.sub(r'\{(filename|floor|custom)\}', replace, template)
+
 class EkahauWriter:
 
     def __init__(self, config:Dict):
@@ -153,14 +174,59 @@ class EkahauWriter:
 
     def read_aps_from_esx(self, esx_filepath:str) -> List[Dict]:
         with ZipFile(esx_filepath) as zf:
+            floorplan_name = {}
+            if 'floorPlans.json' in zf.namelist():
+                with zf.open('floorPlans.json') as fp_f:
+                    fp_json = json.loads(fp_f.read())
+                    floorplan_name = {fp['id']: fp['name'] for fp in fp_json['floorPlans']}
             with zf.open('accessPoints.json') as ap_f:
                 esx_aps = json.loads(ap_f.read())
-        return [
-            {'name': ap['name'], 'model': ap.get('model', '')}
-            for ap in esx_aps['accessPoints']
-        ]
+            aps = []
+            for ap in esx_aps['accessPoints']:
+                floor = ''
+                if 'location' in ap:
+                    floor = floorplan_name.get(ap['location']['floorPlanId'], '')
+                aps.append({
+                    'name': ap['name'],
+                    'model': ap.get('model', ''),
+                    'floor': floor,
+                })
+            return aps
 
-    def export_aps_to_xlsx(self, esx_filepath:str, output_filepath:str=None, name_prefix:str='') -> str:
+    def _build_exported_ap_name(
+        self,
+        ap:Dict,
+        *,
+        prefix_template:str,
+        prefix_custom:str,
+        filename_stem:str,
+        legacy_prefix:str,
+    ) -> str:
+        if prefix_template:
+            prefix = apply_ap_name_prefix_template(
+                prefix_template,
+                filename=filename_stem,
+                floor=ap['floor'],
+                custom=prefix_custom,
+            )
+        elif legacy_prefix:
+            prefix = legacy_prefix
+        else:
+            prefix = ''
+        return prefix + ap['name']
+
+    def export_aps_to_xlsx(
+        self,
+        esx_filepath:str,
+        output_filepath:str=None,
+        *,
+        prefix_template:str=None,
+        prefix_custom:str='',
+        filename_stem:str=None,
+        legacy_prefix:str='',
+    ) -> str:
+        if filename_stem is None:
+            filename_stem = os.path.splitext(os.path.basename(esx_filepath))[0]
         if not output_filepath:
             output_filepath = esx_filepath[:-4] + '_aps.xlsx'
         output_dir = os.path.dirname(output_filepath)
@@ -168,13 +234,49 @@ class EkahauWriter:
             os.makedirs(output_dir, exist_ok=True)
         rows = []
         for ap in self.read_aps_from_esx(esx_filepath):
-            name = ap['name']
-            if name_prefix:
-                name = name_prefix + name
+            name = self._build_exported_ap_name(
+                ap,
+                prefix_template=prefix_template,
+                prefix_custom=prefix_custom,
+                filename_stem=filename_stem,
+                legacy_prefix=legacy_prefix,
+            )
             rows.append({'AP Name': name, 'Model': ap['model']})
         dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model'])
         dataframe.to_excel(output_filepath, sheet_name='ekahau aps', index=False)
         return output_filepath
+
+    def export_esx_folder_to_xlsx(
+        self,
+        esx_folder:str,
+        output_dir:str=None,
+        *,
+        prefix_template:str=None,
+        prefix_custom:str='',
+        legacy_prefix:str='',
+    ) -> List[str]:
+        written = []
+        for entry in sorted(os.listdir(esx_folder)):
+            if not entry.lower().endswith('.esx'):
+                continue
+            esx_path = os.path.join(esx_folder, entry)
+            if not os.path.isfile(esx_path):
+                continue
+            stem = os.path.splitext(entry)[0]
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                output_filepath = os.path.join(output_dir, f'{stem}_aps.xlsx')
+            else:
+                output_filepath = os.path.join(esx_folder, f'{stem}_aps.xlsx')
+            written.append(self.export_aps_to_xlsx(
+                esx_path,
+                output_filepath,
+                prefix_template=prefix_template,
+                prefix_custom=prefix_custom,
+                filename_stem=stem,
+                legacy_prefix=legacy_prefix,
+            ))
+        return written
 
     def replace_ap_names_in_esx_file(self, esx_filepath:str):
 
