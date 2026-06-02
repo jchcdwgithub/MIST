@@ -1202,7 +1202,7 @@ def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
   try:
     path = esx_writer.export_aps_to_xlsx(create_temp_esx_file, output)
     assert path == output
-    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    df = pandas.read_excel(output, sheet_name='test')
     assert list(df.columns) == ['AP Name', 'Model', 'Serial']
     assert len(df) == 5
     assert df['AP Name'].tolist() == ['ap-1'] * 5
@@ -1210,7 +1210,7 @@ def test_export_aps_to_xlsx_writes_expected_columns(create_temp_esx_file):
     assert df['Serial'].fillna('').tolist() == [''] * 5
 
     esx_writer.export_aps_to_xlsx(create_temp_esx_file, prefixed_output, legacy_prefix='PRE-')
-    df_prefixed = pandas.read_excel(prefixed_output, sheet_name='ekahau aps')
+    df_prefixed = pandas.read_excel(prefixed_output, sheet_name='test')
     assert df_prefixed['AP Name'].tolist() == ['PRE-ap-1'] * 5
   finally:
     for filepath in (output, prefixed_output):
@@ -1228,7 +1228,7 @@ def test_export_aps_to_xlsx_with_template(create_temp_esx_file):
       prefix_custom='HQ',
       filename_stem='test',
     )
-    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    df = pandas.read_excel(output, sheet_name='test')
     assert df['AP Name'].tolist() == [
       'test-site1 Flr-0-HQap-1',
       'test-site1 Flr-1-HQap-1',
@@ -1260,8 +1260,8 @@ def test_export_esx_folder_to_xlsx(create_temp_esx_file, get_test_ap_json, get_t
       prefix_template='{filename}-',
     )
     assert len(written) == 2
-    alpha_df = pandas.read_excel(os.path.join(output_dir, 'Alpha_aps.xlsx'), sheet_name='ekahau aps')
-    beta_df = pandas.read_excel(os.path.join(output_dir, 'Beta_aps.xlsx'), sheet_name='ekahau aps')
+    alpha_df = pandas.read_excel(os.path.join(output_dir, 'Alpha_aps.xlsx'), sheet_name='Alpha')
+    beta_df = pandas.read_excel(os.path.join(output_dir, 'Beta_aps.xlsx'), sheet_name='Beta')
     assert alpha_df['AP Name'].tolist() == ['Alpha-ap-1'] * 5
     assert beta_df['AP Name'].tolist() == ['Beta-ap-1'] * 5
   finally:
@@ -1289,7 +1289,7 @@ def test_export_aps_to_xlsx_reads_model_from_esx():
   try:
     esx_writer = file_ops.EkahauWriter(get_test_config_data())
     esx_writer.export_aps_to_xlsx(temp_esx, output)
-    df = pandas.read_excel(output, sheet_name='ekahau aps')
+    df = pandas.read_excel(output, sheet_name='test_models')
     assert df['AP Name'].tolist() == ['AP-A', 'AP-B']
     assert df['Model'].tolist() == ['AP43', '']
     assert df['Serial'].fillna('').tolist() == ['', '']

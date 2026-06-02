@@ -168,6 +168,11 @@ def apply_ap_name_prefix_template(template:str, *, filename:str, floor:str, cust
 
     return re.sub(r'\{(filename|floor|custom)\}', replace, template)
 
+def sanitize_excel_sheet_name(name:str) -> str:
+    for char in r'\/?*[]':
+        name = name.replace(char, '_')
+    return name[:31]
+
 class EkahauWriter:
 
     def __init__(self, config:Dict):
@@ -244,7 +249,7 @@ class EkahauWriter:
             )
             rows.append({'AP Name': name, 'Model': ap['model'], 'Serial': ''})
         dataframe = pandas.DataFrame(rows, columns=['AP Name', 'Model', 'Serial'])
-        sheet_name = 'ekahau aps'
+        sheet_name = sanitize_excel_sheet_name(filename_stem)
         with pandas.ExcelWriter(output_filepath, engine='openpyxl') as writer:
             dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
             table_data = [dataframe.columns.tolist()]
